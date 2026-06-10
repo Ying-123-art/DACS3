@@ -1,0 +1,76 @@
+<resources>
+    <string name="app_name">WildLog</string>
+    <string name="app_tagline">Ghi lại mọi hành trình dã ngoại</string>
+
+    <!-- Auth -->
+    <string name="login">Đăng Nhập</string>
+    <string name="register">Đăng Ký</string>
+    <string name="logout">Đăng xuất</string>
+    <string name="email">Email</string>
+    <string name="password">Mật khẩu</string>
+    <string name="confirm_password">Xác nhận mật khẩu</string>
+    <string name="display_name">Tên hiển thị</string>
+    <string name="create_account">Tạo tài khoản mới</string>
+    <string name="back_to_login">Quay lại Đăng Nhập</string>
+    <string name="login_failed">Đăng nhập thất bại</string>
+    <string name="register_failed">Đăng ký thất bại</string>
+    <string name="password_min_length">Mật khẩu phải có ít nhất 6 ký tự</string>
+    <string name="password_mismatch">Mật khẩu không khớp</string>
+
+    <!-- Home -->
+    <string name="search_hint">Tìm kiếm hành trình, địa điểm...</string>
+    <string name="create_post">Tạo bài đăng</string>
+    <string name="no_posts">Chưa có bài đăng nào</string>
+
+    <!-- Post Actions -->
+    <string name="like">Thích</string>
+    <string name="comment">Bình luận</string>
+    <string name="share">Chia sẻ</string>
+    <string name="edit">Chỉnh sửa</string>
+    <string name="delete">Xóa</string>
+    <string name="cancel">Hủy</string>
+    <string name="save">Lưu</string>
+    <string name="update">Cập nhật</string>
+    <string name="post">Đăng</string>
+
+    <!-- Create/Edit Post -->
+    <string name="title_hint">Tiêu đề (không bắt buộc)</string>
+    <string name="content_hint">Bạn đang nghĩ gì về chuyến đi?</string>
+    <string name="add_photo">Thêm ảnh</string>
+    <string name="change_photo">Đổi ảnh</string>
+    <string name="location">Vị trí</string>
+    <string name="uploading">Đang đăng bài...</string>
+    <string name="delete_post_title">Xóa bài đăng?</string>
+    <string name="delete_post_message">Hành động này không thể hoàn tác. Bài đăng sẽ bị xóa vĩnh viễn.</string>
+
+    <!-- Profile -->
+    <string name="my_profile">Trang Cá Nhân</string>
+    <string name="my_posts">Bài đăng của tôi</string>
+    <string name="change_avatar">Đổi ảnh đại diện</string>
+    <string name="bio_hint">Giới thiệu bản thân</string>
+    <string name="posts_count">Bài đăng</string>
+
+    <!-- Comments -->
+    <string name="comments_title">Bình Luận</string>
+    <string name="write_comment">Viết bình luận...</string>
+    <string name="no_comments">Chưa có bình luận nào</string>
+    <string name="be_first_comment">Hãy là người đầu tiên bình luận!</string>
+
+    <!-- Map -->
+    <string name="map_title">Bản Đồ Hành Trình</string>
+
+    <!-- Admin -->
+    <string name="admin_title">WildLog Admin</string>
+    <string name="admin_subtitle">Bảng điều khiển quản trị</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="all_posts">Bài Viết</string>
+    <string name="all_users">Người Dùng</string>
+    <string name="total_posts">Bài Đăng</string>
+    <string name="total_users">Người Dùng</string>
+    <string name="today_posts">Hôm Nay</string>
+
+    <!-- Errors -->
+    <string name="error_location_denied">Quyền truy cập vị trí bị từ chối</string>
+    <string name="error_no_gps">Không thể lấy vị trí. Hãy bật GPS</string>
+    <string name="error_generic">Đã xảy ra lỗi. Vui lòng thử lại</string>
+</resources>
