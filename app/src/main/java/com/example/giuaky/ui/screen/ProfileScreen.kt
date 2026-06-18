@@ -32,7 +32,8 @@ import com.google.firebase.auth.FirebaseAuth
 fun ProfileScreen(
     viewModel: ProfileViewModel,
     onLogout: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToMap: (Double, Double) -> Unit // Thêm callback điều hướng bản đồ
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -81,7 +82,6 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // Profile header
             item {
                 Column(
                     modifier = Modifier
@@ -205,7 +205,8 @@ fun ProfileScreen(
                         currentUserId = currentUid,
                         onEditClick = {},
                         onLikeClick = {},
-                        onCommentClick = {}
+                        onCommentClick = {},
+                        onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) } // Xử lý nhấn vị trí
                     )
                 }
             }

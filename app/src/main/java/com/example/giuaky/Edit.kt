@@ -1,5 +1,10 @@
 package com.example.giuaky
 
+import android.Manifest
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -10,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,11 +23,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
 import com.example.giuaky.viewmodel.PostViewModel
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,8 +43,11 @@ fun EditScreen(
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var newImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var newImageUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(postId) {
@@ -54,17 +68,33 @@ fun EditScreen(
         }
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        newImageUri = uri
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) newImageUri = uri
     }
 
-    // Delete confirmation dialog
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            newImageUri = tempCameraUri
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val uri = createImageUri(context)
+            tempCameraUri = uri
+            uri?.let { cameraLauncher.launch(it) }
+        } else {
+            Toast.makeText(context, "Cần quyền Camera để chụp ảnh", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Text("🗑️", style = MaterialTheme.typography.headlineMedium) },
             title = { Text("Xóa bài đăng?") },
-            text = { Text("Hành động này không thể hoàn tác. Bài đăng sẽ bị xóa vĩnh viễn.") },
+            text = { Text("Hành động này không thể hoàn tác.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -119,7 +149,6 @@ fun EditScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Image display
                 val displayImageUrl = newImageUri?.toString() ?: uiState.post?.imageUrl ?: ""
                 if (displayImageUrl.isNotEmpty()) {
                     Image(
@@ -134,14 +163,28 @@ fun EditScreen(
                     Spacer(Modifier.height(12.dp))
                 }
 
-                OutlinedButton(
-                    onClick = { launcher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    enabled = !uiState.isLoading
-                ) {
-                    Icon(Icons.Default.Image, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Thay đổi ảnh")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { galleryLauncher.launch("image/*") },
+                        modifier = Modifier.weight(1f),
+                        enabled = !uiState.isLoading,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Image, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Thư viện")
+                    }
+
+                    OutlinedButton(
+                        onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+                        modifier = Modifier.weight(1f),
+                        enabled = !uiState.isLoading,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Chụp ảnh")
+                    }
                 }
 
                 uiState.error?.let {
@@ -149,7 +192,7 @@ fun EditScreen(
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
 
                 if (uiState.isLoading) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -181,5 +224,17 @@ fun EditScreen(
                 }
             }
         }
+    }
+}
+
+private fun createImageUri(context: Context): Uri? {
+    return try {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        if (storageDir?.exists() == false) storageDir.mkdirs()
+        val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
+        FileProvider.getUriForFile(context, "com.example.giuaky.fileprovider", file)
+    } catch (e: Exception) {
+        null
     }
 }

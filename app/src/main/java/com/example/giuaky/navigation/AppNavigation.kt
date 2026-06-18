@@ -2,6 +2,7 @@ package com.example.giuaky.navigation
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -36,9 +37,14 @@ fun AppNavigation(navController: NavHostController) {
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = { role ->
-                    val dest = if (role == "admin") NavRoutes.ADMIN else NavRoutes.HOME
-                    navController.navigate(dest) {
-                        popUpTo(NavRoutes.LOGIN) { inclusive = true }
+                    if (role == "admin") {
+                        navController.navigate(NavRoutes.ADMIN) {
+                            popUpTo(NavRoutes.LOGIN) { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(NavRoutes.HOME) {
+                            popUpTo(NavRoutes.LOGIN) { inclusive = true }
+                        }
                     }
                 },
                 onNavigateToRegister = { navController.navigate(NavRoutes.REGISTER) }
@@ -66,7 +72,10 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToEdit = { postId -> navController.navigate(NavRoutes.editRoute(postId)) },
                 onNavigateToComments = { postId -> navController.navigate(NavRoutes.commentsRoute(postId)) },
                 onNavigateToProfile = { navController.navigate(NavRoutes.PROFILE) },
-                onNavigateToMap = { navController.navigate(NavRoutes.MAP) }
+                onNavigateToMap = {
+                    // Mở bản đồ bình thường
+                    navController.navigate(NavRoutes.mapRoute())
+                }
             )
         }
 
@@ -115,12 +124,35 @@ fun AppNavigation(navController: NavHostController) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToMap = { lat, lon ->
+                    // Điều hướng đến bản đồ với tọa độ cụ thể
+                    navController.navigate(NavRoutes.mapRoute(lat, lon))
+                }
             )
         }
 
-        composable(NavRoutes.MAP) {
+        composable(
+            route = NavRoutes.MAP,
+            arguments = listOf(
+                navArgument("lat") { type = NavType.StringType; nullable = true },
+                navArgument("lon") { type = NavType.StringType; nullable = true }
+            )
+        ) { backStackEntry ->
+            val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull()
+            val lon = backStackEntry.arguments?.getString("lon")?.toDoubleOrNull()
+
             val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory(context))
+
+            // Sử dụng LaunchedEffect để xử lý focus khi tọa độ thay đổi hoặc được truyền vào
+            LaunchedEffect(lat, lon) {
+                if (lat != null && lon != null) {
+                    homeViewModel.setMapFocus(lat, lon)
+                } else {
+                    homeViewModel.clearMapFocus()
+                }
+            }
+
             MapScreen(
                 viewModel = homeViewModel,
                 onBack = { navController.popBackStack() }

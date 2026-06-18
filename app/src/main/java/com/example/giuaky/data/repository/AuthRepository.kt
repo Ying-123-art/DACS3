@@ -16,8 +16,10 @@ class AuthRepository {
         return try {
             val result = auth.signInWithEmailAndPassword(email, password).await()
             val uid = result.user?.uid ?: return Result.failure(Exception("Không tìm thấy người dùng"))
-            val snapshot = db.child("users").child(uid).get().await()
-            val user = snapshot.getValue(User::class.java) ?: User(uid = uid, email = email)
+
+            // Lấy role từ Realtime Database (bảng users, cột role)
+            val role = getUserRoleFromRealtimeDB(uid)
+            val user = User(uid = uid, email = email, role = role)
             Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
@@ -29,13 +31,11 @@ class AuthRepository {
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val uid = result.user?.uid ?: return Result.failure(Exception("Đăng ký thất bại"))
 
-            // Update Firebase Auth display name
             val profileUpdates = UserProfileChangeRequest.Builder()
                 .setDisplayName(displayName)
                 .build()
             result.user?.updateProfile(profileUpdates)?.await()
 
-            // Save user profile to Realtime Database
             val user = User(
                 uid = uid,
                 displayName = displayName,
@@ -43,14 +43,17 @@ class AuthRepository {
                 role = "user",
                 createdAt = System.currentTimeMillis()
             )
+
+            // Lưu vào Realtime Database
             db.child("users").child(uid).setValue(user).await()
+
             Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun getUserRole(uid: String): String {
+    suspend fun getUserRoleFromRealtimeDB(uid: String): String {
         return try {
             val snapshot = db.child("users").child(uid).child("role").get().await()
             snapshot.getValue(String::class.java) ?: "user"

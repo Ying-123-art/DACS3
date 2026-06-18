@@ -40,6 +40,7 @@ fun PostCard(
     onEditClick: () -> Unit,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
+    onLocationClick: (Double, Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isLiked = post.likedBy.containsKey(currentUserId)
@@ -90,11 +91,20 @@ fun PostCard(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                         if (post.location.isNotEmpty()) {
                             Text(" · ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                            Icon(Icons.Default.LocationOn, null,
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.primary)
-                            Text(text = post.location, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary)
+                            Row(
+                                modifier = Modifier.clickable { 
+                                    if (post.latitude != 0.0 && post.longitude != 0.0) {
+                                        onLocationClick(post.latitude, post.longitude)
+                                    }
+                                },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.LocationOn, null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary)
+                                Text(text = post.location, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }

@@ -1,6 +1,10 @@
 package com.example.giuaky
 
 import android.Manifest
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -11,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
@@ -22,9 +27,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
 import com.example.giuaky.viewmodel.PostViewModel
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,7 +43,9 @@ fun CreateScreen(
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var imageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -46,7 +57,29 @@ fun CreateScreen(
     }
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        imageUri = uri
+        if (uri != null) imageUri = uri
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            imageUri = tempCameraUri
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            try {
+                val uri = createImageUri(context)
+                tempCameraUri = uri
+                uri?.let { cameraLauncher.launch(it) }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Lỗi khi mở máy ảnh", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "Cần quyền truy cập máy ảnh để chụp hình", Toast.LENGTH_SHORT).show()
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -129,16 +162,32 @@ fun CreateScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
+            // Action Buttons
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { imageLauncher.launch("image/*") },
                     modifier = Modifier.weight(1f),
                     enabled = !uiState.isLoading,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
                     Icon(Icons.Default.Image, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(if (imageUri == null) "Thêm ảnh" else "Đổi ảnh")
+                    Text("Thư viện", maxLines = 1)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Icon(Icons.Default.CameraAlt, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Chụp ảnh", maxLines = 1)
                 }
 
                 OutlinedButton(
@@ -147,15 +196,15 @@ fun CreateScreen(
                             Manifest.permission.ACCESS_FINE_LOCATION,
                             Manifest.permission.ACCESS_COARSE_LOCATION
                         ))
-                        viewModel.fetchLocation(context)
                     },
                     modifier = Modifier.weight(1f),
                     enabled = !uiState.isLoading,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
                     Icon(Icons.Default.LocationOn, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Vị trí")
+                    Text("Vị trí", maxLines = 1)
                 }
             }
 
@@ -185,5 +234,25 @@ fun CreateScreen(
                 }
             }
         }
+    }
+}
+
+private fun createImageUri(context: Context): Uri? {
+    return try {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        if (storageDir?.exists() == false) storageDir.mkdirs()
+        
+        val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
+        
+        // Sử dụng authority khớp chính xác với Manifest
+        FileProvider.getUriForFile(
+            context,
+            "com.example.giuaky.fileprovider",
+            file
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
     }
 }

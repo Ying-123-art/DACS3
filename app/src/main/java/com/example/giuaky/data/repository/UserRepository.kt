@@ -28,6 +28,7 @@ class UserRepository {
         return try {
             val updates = mapOf("displayName" to displayName, "bio" to bio)
             db.child("users").child(uid).updateChildren(updates).await()
+            
             // Also update Firebase Auth display name
             val profileUpdates = UserProfileChangeRequest.Builder()
                 .setDisplayName(displayName)
@@ -56,6 +57,28 @@ class UserRepository {
             val snapshot = db.child("users").get().await()
             val users = snapshot.children.mapNotNull { it.getValue(User::class.java) }
             Result.success(users)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // --- CÁC HÀM CHO ADMIN (SỬ DỤNG REALTIME DATABASE) ---
+
+    // 1. Kiểm tra role của một user
+    suspend fun getUserRole(uid: String): String {
+        return try {
+            val snapshot = db.child("users").child(uid).child("role").get().await()
+            snapshot.getValue(String::class.java) ?: "user"
+        } catch (e: Exception) {
+            "user"
+        }
+    }
+
+    // 2. Thay đổi role
+    suspend fun updateUserRole(uid: String, newRole: String): Result<Unit> {
+        return try {
+            db.child("users").child(uid).child("role").setValue(newRole).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

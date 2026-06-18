@@ -26,7 +26,7 @@ fun HomeScreen(
     onNavigateToEdit: (String) -> Unit,
     onNavigateToComments: (String) -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: (Double?, Double?) -> Unit // Cập nhật tham số
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by remember { mutableStateOf(NavRoutes.HOME) }
@@ -34,12 +34,8 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text("🌿 WildLog", style = MaterialTheme.typography.titleLarge)
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                title = { Text("🌿 WildLog", style = MaterialTheme.typography.titleLarge) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
@@ -55,24 +51,19 @@ fun HomeScreen(
                 currentTab = route
                 when (route) {
                     NavRoutes.PROFILE -> onNavigateToProfile()
-                    NavRoutes.MAP -> onNavigateToMap()
+                    NavRoutes.MAP -> onNavigateToMap(null, null) // Nhấn trực tiếp tab bản đồ thì không focus
                 }
             }
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+            modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            // Search bar
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 placeholder = { Text("Tìm kiếm hành trình, địa điểm...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 shape = RoundedCornerShape(24.dp),
                 singleLine = true
@@ -83,19 +74,15 @@ fun HomeScreen(
                     items(4) { ShimmerPostCard() }
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(
-                        items = viewModel.filteredPosts,
-                        key = { it.id }
-                    ) { post ->
+                LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
+                    items(items = viewModel.filteredPosts, key = { it.id }) { post ->
                         PostCard(
                             post = post,
                             currentUserId = uiState.currentUserId,
                             onEditClick = { onNavigateToEdit(post.id) },
                             onLikeClick = { viewModel.toggleLike(post.id) },
-                            onCommentClick = { onNavigateToComments(post.id) }
+                            onCommentClick = { onNavigateToComments(post.id) },
+                            onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) } // Truyền tọa độ
                         )
                     }
                 }

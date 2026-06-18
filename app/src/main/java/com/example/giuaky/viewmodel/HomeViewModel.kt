@@ -18,7 +18,8 @@ data class HomeUiState(
     val posts: List<Post> = emptyList(),
     val isLoading: Boolean = true,
     val searchQuery: String = "",
-    val currentUserId: String = ""
+    val currentUserId: String = "",
+    val mapFocusPoint: Pair<Double, Double>? = null
 )
 
 class HomeViewModel(context: Context) : ViewModel() {
@@ -38,7 +39,8 @@ class HomeViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             postDao.getAllPosts().collect { cached ->
                 if (_uiState.value.isLoading && cached.isNotEmpty()) {
-                    _uiState.update { it.copy(posts = cached.map { e -> e.toPost() }, isLoading = false) }
+                    val approvedCached = cached.map { e -> e.toPost() }.filter { it.status == "approved" }
+                    _uiState.update { it.copy(posts = approvedCached, isLoading = false) }
                 }
             }
         }
@@ -47,8 +49,8 @@ class HomeViewModel(context: Context) : ViewModel() {
     private fun loadPosts() {
         viewModelScope.launch {
             repository.getAllPosts().collect { posts ->
-                _uiState.update { it.copy(posts = posts, isLoading = false) }
-                // Cache to Room
+                val approvedPosts = posts.filter { it.status == "approved" }
+                _uiState.update { it.copy(posts = approvedPosts, isLoading = false) }
                 val entities = posts.map { it.toEntity() }
                 postDao.upsertAll(entities)
             }
@@ -64,6 +66,14 @@ class HomeViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             repository.toggleLike(postId, currentUserId, currentlyLiked)
         }
+    }
+
+    fun setMapFocus(lat: Double, lon: Double) {
+        _uiState.update { it.copy(mapFocusPoint = Pair(lat, lon)) }
+    }
+
+    fun clearMapFocus() {
+        _uiState.update { it.copy(mapFocusPoint = null) }
     }
 
     val filteredPosts: List<Post>
@@ -82,12 +92,14 @@ private fun Post.toEntity() = PostEntity(
     id = id, userId = userId, authorName = authorName, authorAvatarUrl = authorAvatarUrl,
     title = title, content = content, imageUrl = imageUrl, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
-    likesCount = likesCount, commentsCount = commentsCount
+    likesCount = likesCount, commentsCount = commentsCount,
+    status = status
 )
 
 private fun PostEntity.toPost() = Post(
     id = id, userId = userId, authorName = authorName, authorAvatarUrl = authorAvatarUrl,
     title = title, content = content, imageUrl = imageUrl, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
-    likesCount = likesCount, commentsCount = commentsCount
+    likesCount = likesCount, commentsCount = commentsCount,
+    status = status
 )

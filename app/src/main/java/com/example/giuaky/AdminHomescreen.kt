@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.TrendingUp
@@ -155,6 +157,13 @@ fun StatCard(label: String, value: String, icon: ImageVector, color: Color, modi
 fun PostsTab(viewModel: AdminViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var deleteTarget by remember { mutableStateOf<String?>(null) }
+    var filterMode by remember { mutableIntStateOf(0) } // 0: Chờ duyệt, 1: Tất cả
+
+    val displayPosts = if (filterMode == 0) {
+        uiState.allPosts.filter { it.status == "pending" }
+    } else {
+        uiState.allPosts
+    }
 
     deleteTarget?.let { postId ->
         val post = uiState.allPosts.find { it.id == postId }
@@ -174,36 +183,92 @@ fun PostsTab(viewModel: AdminViewModel) {
         )
     }
 
-    LazyColumn(contentPadding = PaddingValues(8.dp)) {
-        items(uiState.allPosts, key = { it.id }) { post ->
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(12.dp)
+    Column {
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            SegmentedButton(
+                selected = filterMode == 0,
+                onClick = { filterMode = 0 },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (post.imageUrl.isNotEmpty()) {
-                        Image(
-                            painter = rememberAsyncImagePainter(post.imageUrl),
-                            contentDescription = null,
-                            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(Modifier.width(10.dp))
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(post.title.ifEmpty { "(Không có tiêu đề)" },
-                            fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text(post.authorName, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        Text("❤ ${post.likesCount} · 💬 ${post.commentsCount}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    IconButton(onClick = { deleteTarget = post.id }) {
-                        Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                Text("Chờ duyệt (${uiState.allPosts.count { it.status == "pending" }})")
+            }
+            SegmentedButton(
+                selected = filterMode == 1,
+                onClick = { filterMode = 1 },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Text("Tất cả")
+            }
+        }
+
+        if (displayPosts.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Không có bài viết nào", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        } else {
+            LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(displayPosts, key = { it.id }) { post ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (post.imageUrl.isNotEmpty()) {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(post.imageUrl),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(post.title.ifEmpty { "(Không có tiêu đề)" },
+                                        fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("Bởi: ${post.authorName}", style = MaterialTheme.typography.bodySmall)
+                                    
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AssistChip(
+                                            onClick = {},
+                                            label = { Text(post.status.uppercase()) },
+                                            colors = AssistChipDefaults.assistChipColors(
+                                                labelColor = when(post.status) {
+                                                    "approved" -> Color(0xFF2E7D32)
+                                                    "pending" -> Color(0xFFE65100)
+                                                    else -> Color.Red
+                                                }
+                                            )
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("❤ ${post.likesCount} · 💬 ${post.commentsCount}",
+                                            style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                            
+                            Spacer(Modifier.height(8.dp))
+                            Text(post.content, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                if (post.status == "pending") {
+                                    IconButton(onClick = { viewModel.approvePost(post.id) }) {
+                                        Icon(Icons.Default.Check, "Duyệt", tint = Color(0xFF2E7D32))
+                                    }
+                                    IconButton(onClick = { viewModel.rejectPost(post.id) }) {
+                                        Icon(Icons.Default.Close, "Từ chối", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                IconButton(onClick = { deleteTarget = post.id }) {
+                                    Icon(Icons.Default.Delete, "Xóa", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
                     }
                 }
             }

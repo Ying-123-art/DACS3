@@ -56,7 +56,8 @@ fun MapScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "📍 ${postsWithLocation.size} địa điểm được ghi lại",
+                        if (uiState.mapFocusPoint != null) "📍 Đang hiển thị vị trí được chọn" 
+                        else "📍 ${postsWithLocation.size} địa điểm được ghi lại",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -70,12 +71,14 @@ fun MapScreen(
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         controller.setZoom(6.0)
-                        // Center on Vietnam
+                        // Default center on Vietnam
                         controller.setCenter(GeoPoint(16.0, 108.0))
                     }
                 },
                 update = { mapView ->
                     mapView.overlays.clear()
+                    
+                    // Add markers for all posts
                     postsWithLocation.forEach { post ->
                         val marker = Marker(mapView).apply {
                             position = GeoPoint(post.latitude, post.longitude)
@@ -85,6 +88,14 @@ fun MapScreen(
                         }
                         mapView.overlays.add(marker)
                     }
+
+                    // Handle focus point if it exists
+                    uiState.mapFocusPoint?.let { (lat, lon) ->
+                        val focusPoint = GeoPoint(lat, lon)
+                        mapView.controller.animateTo(focusPoint)
+                        mapView.controller.setZoom(15.0)
+                    }
+
                     mapView.invalidate()
                 },
                 modifier = Modifier.fillMaxSize()
