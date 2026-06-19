@@ -7,28 +7,61 @@ import com.example.giuaky.data.local.AppDatabase
 import com.example.giuaky.data.local.PostEntity
 import com.example.giuaky.data.model.Post
 import com.example.giuaky.data.repository.PostRepository
+import com.example.giuaky.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val posts: List<Post> = emptyList(),
+    val filteredPosts: List<Post> = emptyList(),
     val isLoading: Boolean = true,
     val searchQuery: String = "",
     val currentUserId: String = "",
-    val mapFocusPoint: Pair<Double, Double>? = null
+    val mapFocusPoint: Pair<Double, Double>? = null,
+    val error: String? = null
 )
 
 class HomeViewModel(context: Context) : ViewModel() {
     private val repository = PostRepository()
+    private val userRepository = UserRepository()
     private val postDao = AppDatabase.getInstance(context).postDao()
-    private val _uiState = MutableStateFlow(HomeUiState(
-        currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    ))
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    private val _isLoading = MutableStateFlow(true)
+    private val _searchQuery = MutableStateFlow("")
+    private val _mapFocusPoint = MutableStateFlow<Pair<Double, Double>?>(null)
+    private val _currentUserId = MutableStateFlow(FirebaseAuth.getInstance().currentUser?.uid ?: "")
+    private val _error = MutableStateFlow<String?>(null)
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        _posts, _isLoading, _searchQuery, _mapFocusPoint, _currentUserId, _error
+    ) { posts, isLoading, searchQuery, mapFocusPoint, currentUserId, error ->
+        val filtered = if (searchQuery.isBlank()) {
+            posts
+        } else {
+            posts.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.content.contains(searchQuery, ignoreCase = true) ||
+                it.location.contains(searchQuery, ignoreCase = true) ||
+                it.sharedContent.contains(searchQuery, ignoreCase = true)
+            }
+        }
+        
+        HomeUiState(
+            posts = posts,
+            filteredPosts = filtered,
+            isLoading = isLoading,
+            searchQuery = searchQuery,
+            currentUserId = currentUserId,
+            mapFocusPoint = mapFocusPoint,
+            error = error
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = HomeUiState()
+    )
 
     init {
         loadPosts()
@@ -38,9 +71,10 @@ class HomeViewModel(context: Context) : ViewModel() {
     private fun observeCachedPosts(context: Context) {
         viewModelScope.launch {
             postDao.getAllPosts().collect { cached ->
-                if (_uiState.value.isLoading && cached.isNotEmpty()) {
+                if (_isLoading.value && cached.isNotEmpty()) {
                     val approvedCached = cached.map { e -> e.toPost() }.filter { it.status == "approved" }
-                    _uiState.update { it.copy(posts = approvedCached, isLoading = false) }
+                    _posts.value = approvedCached
+                    _isLoading.value = false
                 }
             }
         }
@@ -50,42 +84,54 @@ class HomeViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             repository.getAllPosts().collect { posts ->
                 val approvedPosts = posts.filter { it.status == "approved" }
-                _uiState.update { it.copy(posts = approvedPosts, isLoading = false) }
+                _posts.value = approvedPosts
+                _isLoading.value = false
+                
                 val entities = posts.map { it.toEntity() }
                 postDao.upsertAll(entities)
             }
         }
     }
 
-    fun setSearchQuery(query: String) = _uiState.update { it.copy(searchQuery = query) }
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
 
     fun toggleLike(postId: String) {
-        val currentUserId = _uiState.value.currentUserId
-        val post = _uiState.value.posts.find { it.id == postId } ?: return
+        val currentUserId = _currentUserId.value
+        val post = _posts.value.find { it.id == postId } ?: return
         val currentlyLiked = post.likedBy.containsKey(currentUserId)
         viewModelScope.launch {
             repository.toggleLike(postId, currentUserId, currentlyLiked)
         }
     }
 
+    fun sharePost(originalPost: Post, sharedText: String) {
+        val currentUserId = _currentUserId.value
+        viewModelScope.launch {
+            val userResult = userRepository.getUserProfile(currentUserId)
+            userResult.fold(
+                onSuccess = { currentUser ->
+                    repository.sharePost(originalPost, currentUserId, currentUser, sharedText)
+                },
+                onFailure = { e ->
+                    _error.value = "Không thể lấy thông tin người dùng để chia sẻ"
+                }
+            )
+        }
+    }
+
     fun setMapFocus(lat: Double, lon: Double) {
-        _uiState.update { it.copy(mapFocusPoint = Pair(lat, lon)) }
+        _mapFocusPoint.value = Pair(lat, lon)
     }
 
     fun clearMapFocus() {
-        _uiState.update { it.copy(mapFocusPoint = null) }
+        _mapFocusPoint.value = null
     }
 
-    val filteredPosts: List<Post>
-        get() {
-            val query = _uiState.value.searchQuery
-            return if (query.isBlank()) _uiState.value.posts
-            else _uiState.value.posts.filter {
-                it.title.contains(query, ignoreCase = true) ||
-                it.content.contains(query, ignoreCase = true) ||
-                it.location.contains(query, ignoreCase = true)
-            }
-        }
+    fun clearError() {
+        _error.value = null
+    }
 }
 
 private fun Post.toEntity() = PostEntity(
@@ -93,7 +139,11 @@ private fun Post.toEntity() = PostEntity(
     title = title, content = content, imageUrl = imageUrl, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
     likesCount = likesCount, commentsCount = commentsCount,
-    status = status
+    status = status,
+    isShared = isShared,
+    originalPostId = originalPostId,
+    sharedContent = sharedContent,
+    originalAuthorName = originalAuthorName
 )
 
 private fun PostEntity.toPost() = Post(
@@ -101,5 +151,9 @@ private fun PostEntity.toPost() = Post(
     title = title, content = content, imageUrl = imageUrl, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
     likesCount = likesCount, commentsCount = commentsCount,
-    status = status
+    status = status,
+    isShared = isShared,
+    originalPostId = originalPostId,
+    sharedContent = sharedContent,
+    originalAuthorName = originalAuthorName
 )

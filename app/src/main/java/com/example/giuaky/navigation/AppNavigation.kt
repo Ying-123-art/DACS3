@@ -18,12 +18,14 @@ import com.example.giuaky.LoginScreen
 import com.example.giuaky.RegisterScreen
 import com.example.giuaky.ui.screen.CommentScreen
 import com.example.giuaky.ui.screen.MapScreen
+import com.example.giuaky.ui.screen.NotificationScreen
 import com.example.giuaky.ui.screen.ProfileScreen
 import com.example.giuaky.viewmodel.AdminViewModel
 import com.example.giuaky.viewmodel.AuthViewModel
 import com.example.giuaky.viewmodel.CommentViewModel
 import com.example.giuaky.viewmodel.HomeViewModel
 import com.example.giuaky.viewmodel.HomeViewModelFactory
+import com.example.giuaky.viewmodel.NotificationViewModel
 import com.example.giuaky.viewmodel.PostViewModel
 import com.example.giuaky.viewmodel.ProfileViewModel
 
@@ -72,10 +74,10 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToEdit = { postId -> navController.navigate(NavRoutes.editRoute(postId)) },
                 onNavigateToComments = { postId -> navController.navigate(NavRoutes.commentsRoute(postId)) },
                 onNavigateToProfile = { navController.navigate(NavRoutes.PROFILE) },
-                onNavigateToMap = {
-                    // Mở bản đồ bình thường
-                    navController.navigate(NavRoutes.mapRoute())
-                }
+                onNavigateToMap = { lat, lon ->
+                    navController.navigate(NavRoutes.mapRoute(lat, lon))
+                },
+                onNavigateToNotifications = { navController.navigate(NavRoutes.NOTIFICATIONS) }
             )
         }
 
@@ -126,8 +128,10 @@ fun AppNavigation(navController: NavHostController) {
                 },
                 onBack = { navController.popBackStack() },
                 onNavigateToMap = { lat, lon ->
-                    // Điều hướng đến bản đồ với tọa độ cụ thể
                     navController.navigate(NavRoutes.mapRoute(lat, lon))
+                },
+                onShareClick = { originalPost, sharedText ->
+                    profileViewModel.sharePost(originalPost, sharedText)
                 }
             )
         }
@@ -144,7 +148,6 @@ fun AppNavigation(navController: NavHostController) {
 
             val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory(context))
 
-            // Sử dụng LaunchedEffect để xử lý focus khi tọa độ thay đổi hoặc được truyền vào
             LaunchedEffect(lat, lon) {
                 if (lat != null && lon != null) {
                     homeViewModel.setMapFocus(lat, lon)
@@ -156,6 +159,20 @@ fun AppNavigation(navController: NavHostController) {
             MapScreen(
                 viewModel = homeViewModel,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoutes.NOTIFICATIONS) {
+            val notificationViewModel: NotificationViewModel = viewModel()
+            NotificationScreen(
+                viewModel = notificationViewModel,
+                onNavigateToPost = { postId ->
+                    navController.navigate(NavRoutes.commentsRoute(postId))
+                },
+                onBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(NavRoutes.HOME) },
+                onNavigateToMap = { navController.navigate(NavRoutes.mapRoute()) },
+                onNavigateToProfile = { navController.navigate(NavRoutes.PROFILE) }
             )
         }
 

@@ -3,14 +3,17 @@ package com.example.giuaky.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.example.giuaky.navigation.NavRoutes
 
 data class BottomNavItem(
     val label: String,
@@ -20,9 +23,10 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("Trang Chủ", "home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem("Bản Đồ", "map", Icons.Filled.Map, Icons.Outlined.Map),
-    BottomNavItem("Cá Nhân", "profile", Icons.Filled.Person, Icons.Outlined.Person)
+    BottomNavItem("Trang Chủ", NavRoutes.HOME, Icons.Filled.Home, Icons.Outlined.Home),
+    BottomNavItem("Bản Đồ", NavRoutes.MAP, Icons.Filled.Map, Icons.Outlined.Map),
+    BottomNavItem("Thông báo", NavRoutes.NOTIFICATIONS, Icons.Filled.Notifications, Icons.Outlined.Notifications),
+    BottomNavItem("Cá Nhân", NavRoutes.PROFILE, Icons.Filled.Person, Icons.Outlined.Person)
 )
 
 @Composable

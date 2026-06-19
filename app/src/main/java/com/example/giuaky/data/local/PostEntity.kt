@@ -18,5 +18,11 @@ data class PostEntity(
     val timestamp: Long = 0L,
     val likesCount: Int = 0,
     val commentsCount: Int = 0,
-    val status: String = "pending"
+    val status: String = "pending",
+    
+    // Sharing fields
+    val isShared: Boolean = false,
+    val originalPostId: String? = null,
+    val sharedContent: String = "",
+    val originalAuthorName: String = ""
 )

@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.giuaky.data.model.Post
 import com.example.giuaky.navigation.NavRoutes
 import com.example.giuaky.ui.components.BottomNavBar
 import com.example.giuaky.ui.components.PostCard
@@ -26,10 +27,48 @@ fun HomeScreen(
     onNavigateToEdit: (String) -> Unit,
     onNavigateToComments: (String) -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToMap: (Double?, Double?) -> Unit // Cập nhật tham số
+    onNavigateToMap: (Double?, Double?) -> Unit,
+    onNavigateToNotifications: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by remember { mutableStateOf(NavRoutes.HOME) }
+    var sharingPost by remember { mutableStateOf<Post?>(null) }
+    var shareText by remember { mutableStateOf("") }
+
+    // Share Dialog
+    sharingPost?.let { post ->
+        AlertDialog(
+            onDismissRequest = { sharingPost = null },
+            title = { Text("Chia sẻ bài viết") },
+            text = {
+                Column {
+                    Text("Bạn muốn nói gì về bài viết này?", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = shareText,
+                        onValueChange = { shareText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Nhập nội dung chia sẻ...") },
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.sharePost(post, shareText)
+                    sharingPost = null
+                    shareText = ""
+                }) {
+                    Text("Chia sẻ ngay")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sharingPost = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -51,7 +90,8 @@ fun HomeScreen(
                 currentTab = route
                 when (route) {
                     NavRoutes.PROFILE -> onNavigateToProfile()
-                    NavRoutes.MAP -> onNavigateToMap(null, null) // Nhấn trực tiếp tab bản đồ thì không focus
+                    NavRoutes.MAP -> onNavigateToMap(null, null)
+                    NavRoutes.NOTIFICATIONS -> onNavigateToNotifications()
                 }
             }
         }
@@ -59,12 +99,22 @@ fun HomeScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
+            // Thanh tìm kiếm
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Tìm kiếm hành trình, địa điểm...") },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                placeholder = { Text("Tìm kiếm bài viết, địa điểm...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            Text("✕")
+                        }
+                    }
+                },
                 shape = RoundedCornerShape(24.dp),
                 singleLine = true
             )
@@ -74,16 +124,23 @@ fun HomeScreen(
                     items(4) { ShimmerPostCard() }
                 }
             } else {
-                LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
-                    items(items = viewModel.filteredPosts, key = { it.id }) { post ->
-                        PostCard(
-                            post = post,
-                            currentUserId = uiState.currentUserId,
-                            onEditClick = { onNavigateToEdit(post.id) },
-                            onLikeClick = { viewModel.toggleLike(post.id) },
-                            onCommentClick = { onNavigateToComments(post.id) },
-                            onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) } // Truyền tọa độ
-                        )
+                if (uiState.filteredPosts.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Text("Không tìm thấy kết quả phù hợp", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                    }
+                } else {
+                    LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
+                        items(items = uiState.filteredPosts, key = { it.id }) { post ->
+                            PostCard(
+                                post = post,
+                                currentUserId = uiState.currentUserId,
+                                onEditClick = { onNavigateToEdit(post.id) },
+                                onLikeClick = { viewModel.toggleLike(post.id) },
+                                onCommentClick = { onNavigateToComments(post.id) },
+                                onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) },
+                                onShareClick = { sharingPost = post }
+                            )
+                        }
                     }
                 }
             }

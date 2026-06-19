@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +43,7 @@ fun PostCard(
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onLocationClick: (Double, Double) -> Unit,
+    onShareClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isLiked = post.likedBy.containsKey(currentUserId)
@@ -89,7 +92,7 @@ fun PostCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = dateString, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        if (post.location.isNotEmpty()) {
+                        if (post.location.isNotEmpty() && !post.isShared) {
                             Text(" · ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                             Row(
                                 modifier = Modifier.clickable { 
@@ -108,7 +111,7 @@ fun PostCard(
                         }
                     }
                 }
-                if (post.userId == currentUserId) {
+                if (post.userId == currentUserId && !post.isShared) {
                     IconButton(onClick = onEditClick) {
                         Icon(Icons.Default.MoreVert, null,
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
@@ -116,34 +119,88 @@ fun PostCard(
                 }
             }
 
-            // Title & Content
-            if (post.title.isNotEmpty()) {
+            // Shared content (user's caption for shared post)
+            if (post.isShared && post.sharedContent.isNotEmpty()) {
                 Text(
-                    text = post.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                    modifier = Modifier.padding(horizontal = 12.dp)
+                    text = post.sharedContent,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.bodyLarge
                 )
-                Spacer(Modifier.height(4.dp))
-            }
-            if (post.content.isNotEmpty()) {
-                Text(
-                    text = post.content,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                )
+                Spacer(Modifier.height(8.dp))
             }
 
-            // Image
-            if (post.imageUrl.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Image(
-                    painter = rememberAsyncImagePainter(post.imageUrl),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp),
-                    contentScale = ContentScale.Crop
-                )
+            // Original Post Container (if shared)
+            Box(
+                modifier = if (post.isShared) {
+                    Modifier
+                        .padding(horizontal = 12.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                        .padding(8.dp)
+                } else Modifier
+            ) {
+                Column {
+                    if (post.isShared) {
+                        Text(
+                            text = "Đã chia sẻ bài viết của ${post.originalAuthorName}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontStyle = FontStyle.Italic,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    // Title & Content
+                    if (post.title.isNotEmpty()) {
+                        Text(
+                            text = post.title,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 17.sp,
+                            modifier = Modifier.padding(horizontal = if (post.isShared) 0.dp else 12.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    if (post.content.isNotEmpty()) {
+                        Text(
+                            text = post.content,
+                            modifier = Modifier.padding(horizontal = if (post.isShared) 0.dp else 12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                        )
+                    }
+
+                    // Image
+                    if (post.imageUrl.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Image(
+                            painter = rememberAsyncImagePainter(post.imageUrl),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 180.dp, max = 360.dp)
+                                .then(if (post.isShared) Modifier.clip(RoundedCornerShape(8.dp)) else Modifier),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    
+                    if (post.isShared && post.location.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.clickable { 
+                                if (post.latitude != 0.0 && post.longitude != 0.0) {
+                                    onLocationClick(post.latitude, post.longitude)
+                                }
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.LocationOn, null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(4.dp))
+                            Text(text = post.location, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
             }
 
             // Likes count
@@ -192,7 +249,7 @@ fun PostCard(
                     Spacer(Modifier.width(4.dp))
                     Text("Bình luận", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
-                TextButton(onClick = {}) {
+                TextButton(onClick = onShareClick) {
                     Icon(Icons.Default.Share, null,
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))

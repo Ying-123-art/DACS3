@@ -1,7 +1,9 @@
 package com.example.giuaky.data.repository
 
 import android.net.Uri
+import com.example.giuaky.data.model.Notification
 import com.example.giuaky.data.model.Post
+import com.example.giuaky.data.model.User
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -16,6 +18,7 @@ import java.util.UUID
 class PostRepository {
     private val db = FirebaseDatabase.getInstance().getReference("posts")
     private val storage = FirebaseStorage.getInstance().reference
+    private val notificationRepo = NotificationRepository()
 
     fun getAllPosts(): Flow<List<Post>> = callbackFlow {
         val listener = object : ValueEventListener {
@@ -65,6 +68,48 @@ class PostRepository {
         }
     }
 
+    suspend fun sharePost(originalPost: Post, currentUserId: String, currentUser: User, sharedText: String): Result<Unit> {
+        return try {
+            val postId = db.push().key ?: return Result.failure(Exception("Lỗi tạo ID"))
+            val sharedPost = Post(
+                id = postId,
+                userId = currentUserId,
+                authorName = currentUser.displayName,
+                authorAvatarUrl = currentUser.avatarUrl,
+                title = originalPost.title,
+                content = originalPost.content,
+                imageUrl = originalPost.imageUrl,
+                location = originalPost.location,
+                latitude = originalPost.latitude,
+                longitude = originalPost.longitude,
+                timestamp = System.currentTimeMillis(),
+                status = "approved", // Shared posts are usually approved immediately if original was
+                isShared = true,
+                originalPostId = originalPost.id,
+                sharedContent = sharedText,
+                originalAuthorName = originalPost.authorName
+            )
+            db.child(postId).setValue(sharedPost).await()
+
+            // Notify original author
+            val notification = Notification(
+                toUserId = originalPost.userId,
+                fromUserId = currentUserId,
+                fromUserName = currentUser.displayName,
+                fromUserAvatar = currentUser.avatarUrl,
+                postId = postId,
+                type = "share",
+                content = "đã chia sẻ bài viết của bạn",
+                timestamp = System.currentTimeMillis()
+            )
+            notificationRepo.addNotification(notification)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun updatePost(postId: String, title: String, content: String, imageUrl: String, newImageUri: Uri?): Result<Unit> {
         return try {
             val finalImageUrl = if (newImageUri != null) uploadImage(newImageUri) else imageUrl
@@ -72,7 +117,7 @@ class PostRepository {
                 "title" to title,
                 "content" to content,
                 "imageUrl" to finalImageUrl,
-                "status" to "pending" // Reset to pending after edit
+                "status" to "pending"
             )
             db.child(postId).updateChildren(updates).await()
             Result.success(Unit)
@@ -93,7 +138,7 @@ class PostRepository {
     suspend fun deletePost(postId: String, imageUrl: String): Result<Unit> {
         return try {
             db.child(postId).removeValue().await()
-            if (imageUrl.isNotEmpty()) {
+            if (imageUrl.isNotEmpty() && !imageUrl.contains("original")) { // Simplistic check to avoid deleting original images if it's a share
                 try { storage.storage.getReferenceFromUrl(imageUrl).delete().await() } catch (_: Exception) {}
             }
             Result.success(Unit)
@@ -115,6 +160,25 @@ class PostRepository {
                 likeRef.setValue(true).await()
                 countRef.get().await().getValue(Int::class.java)?.let { count ->
                     countRef.setValue(count + 1).await()
+                }
+                
+                val postSnapshot = db.child(postId).get().await()
+                val post = postSnapshot.getValue(Post::class.java)
+                val userSnapshot = FirebaseDatabase.getInstance().getReference("users").child(userId).get().await()
+                val user = userSnapshot.getValue(User::class.java)
+
+                if (post != null && user != null) {
+                    val notification = Notification(
+                        toUserId = post.userId,
+                        fromUserId = userId,
+                        fromUserName = user.displayName,
+                        fromUserAvatar = user.avatarUrl,
+                        postId = postId,
+                        type = "like",
+                        content = "đã thích bài viết của bạn",
+                        timestamp = System.currentTimeMillis()
+                    )
+                    notificationRepo.addNotification(notification)
                 }
             }
             Result.success(Unit)

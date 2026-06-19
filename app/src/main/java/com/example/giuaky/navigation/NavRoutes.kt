@@ -8,7 +8,8 @@ object NavRoutes {
     const val EDIT = "edit/{postId}"
     const val PROFILE = "profile"
     const val COMMENTS = "comments/{postId}"
-    const val MAP = "map?lat={lat}&lon={lon}" // Hỗ trợ tham số truy vấn
+    const val MAP = "map?lat={lat}&lon={lon}"
+    const val NOTIFICATIONS = "notifications"
     const val ADMIN = "admin"
 
     fun editRoute(postId: String) = "edit/$postId"

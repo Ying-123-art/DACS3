@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
+import com.example.giuaky.data.model.Post
 import com.example.giuaky.ui.components.PostCard
 import com.example.giuaky.viewmodel.ProfileViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -33,13 +34,18 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     onLogout: () -> Unit,
     onBack: () -> Unit,
-    onNavigateToMap: (Double, Double) -> Unit // Thêm callback điều hướng bản đồ
+    onNavigateToMap: (Double, Double) -> Unit,
+    onShareClick: (Post, String) -> Unit // Thêm callback chia sẻ bài viết
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     var isEditing by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
+    
+    // State cho việc chia sẻ bài viết
+    var sharingPost by remember { mutableStateOf<Post?>(null) }
+    var shareText by remember { mutableStateOf("") }
 
     LaunchedEffect(currentUid) {
         viewModel.loadProfile(currentUid)
@@ -54,6 +60,39 @@ fun ProfileScreen(
 
     val avatarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.uploadAvatar(currentUid, it) }
+    }
+
+    // Share Dialog tương tự HomeScreen
+    sharingPost?.let { post ->
+        AlertDialog(
+            onDismissRequest = { sharingPost = null },
+            title = { Text("Chia sẻ lại kỷ niệm") },
+            text = {
+                Column {
+                    Text("Viết gì đó về bài đăng này...", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = shareText,
+                        onValueChange = { shareText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Cảm nghĩ của bạn...") },
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onShareClick(post, shareText)
+                    sharingPost = null
+                    shareText = ""
+                }) {
+                    Text("Chia sẻ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sharingPost = null }) { Text("Hủy") }
+            }
+        )
     }
 
     Scaffold(
@@ -203,10 +242,11 @@ fun ProfileScreen(
                     PostCard(
                         post = post,
                         currentUserId = currentUid,
-                        onEditClick = {},
-                        onLikeClick = {},
+                        onEditClick = {}, // Có thể thêm logic edit nếu cần
+                        onLikeClick = {}, // Có thể thêm logic like trong profile
                         onCommentClick = {},
-                        onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) } // Xử lý nhấn vị trí
+                        onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) },
+                        onShareClick = { sharingPost = post } // Kích hoạt dialog chia sẻ
                     )
                 }
             }

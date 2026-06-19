@@ -15,5 +15,11 @@ data class Post(
     val likesCount: Int = 0,
     val commentsCount: Int = 0,
     val likedBy: Map<String, Boolean> = emptyMap(),
-    val status: String = "pending" // "pending", "approved", "rejected"
+    val status: String = "pending", // "pending", "approved", "rejected"
+    
+    // Sharing properties
+    val isShared: Boolean = false,
+    val originalPostId: String? = null,
+    val sharedContent: String = "", // The text added by the person sharing
+    val originalAuthorName: String = ""
 )

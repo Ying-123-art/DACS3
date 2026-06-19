@@ -76,5 +76,12 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
+    fun sharePost(originalPost: Post, sharedText: String) {
+        val currentUser = _uiState.value.user ?: return
+        viewModelScope.launch {
+            postRepo.sharePost(originalPost, currentUser.uid, currentUser, sharedText)
+        }
+    }
+
     fun clearSaveSuccess() = _uiState.update { it.copy(saveSuccess = false) }
 }
