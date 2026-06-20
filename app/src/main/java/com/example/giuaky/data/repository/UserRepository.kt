@@ -1,18 +1,14 @@
 package com.example.giuaky.data.repository
 
-import android.net.Uri
 import com.example.giuaky.data.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 class UserRepository {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance().reference
-    private val storage = FirebaseStorage.getInstance().reference
 
     suspend fun getUserProfile(uid: String): Result<User> {
         return try {
@@ -40,13 +36,10 @@ class UserRepository {
         }
     }
 
-    suspend fun uploadAvatar(uid: String, uri: Uri): Result<String> {
+    suspend fun updateAvatar(uid: String, base64Avatar: String): Result<Unit> {
         return try {
-            val ref = storage.child("avatars/$uid/${UUID.randomUUID()}.jpg")
-            ref.putFile(uri).await()
-            val url = ref.downloadUrl.await().toString()
-            db.child("users").child(uid).child("avatarUrl").setValue(url).await()
-            Result.success(url)
+            db.child("users").child(uid).child("avatarUrl").setValue(base64Avatar).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

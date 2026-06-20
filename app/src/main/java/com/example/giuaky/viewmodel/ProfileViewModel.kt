@@ -1,17 +1,24 @@
 package com.example.giuaky.viewmodel
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.giuaky.data.model.Post
 import com.example.giuaky.data.model.User
 import com.example.giuaky.data.repository.PostRepository
 import com.example.giuaky.data.repository.UserRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 data class ProfileUiState(
     val user: User? = null,
@@ -38,7 +45,6 @@ class ProfileViewModel : ViewModel() {
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
-        // Separate coroutine for posts flow
         viewModelScope.launch {
             postRepo.getPostsByUser(uid).collect { posts ->
                 _uiState.update { it.copy(posts = posts) }
@@ -65,15 +71,50 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun uploadAvatar(uid: String, uri: Uri) {
+    fun uploadAvatar(context: Context, uid: String, uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
-            val result = userRepo.uploadAvatar(uid, uri)
-            result.onSuccess { url ->
-                _uiState.update { it.copy(isSaving = false, user = it.user?.copy(avatarUrl = url)) }
+            val base64Avatar = uriToBase64(context, uri)
+            if (base64Avatar.isNotEmpty()) {
+                val result = userRepo.updateAvatar(uid, base64Avatar)
+                result.onSuccess {
+                    _uiState.update { it.copy(isSaving = false, user = it.user?.copy(avatarUrl = base64Avatar)) }
+                }.onFailure { e ->
+                    _uiState.update { it.copy(isSaving = false, error = e.message) }
+                }
+            } else {
+                _uiState.update { it.copy(isSaving = false, error = "Lỗi xử lý ảnh") }
             }
-            result.onFailure { _uiState.update { it.copy(isSaving = false) } }
         }
+    }
+
+    private suspend fun uriToBase64(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream?.close() ?: return@withContext ""
+            
+            val scaledBitmap = scaleBitmap(bitmap)
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
+            val byteArray = outputStream.toByteArray()
+            "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun scaleBitmap(bitmap: Bitmap): Bitmap {
+        val maxSize = 250 // Avatar cần nhỏ hơn post để tiết kiệm dung lượng
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= maxSize && height <= maxSize) return bitmap
+        val ratio: Float = width.toFloat() / height.toFloat()
+        var finalWidth = maxSize
+        var finalHeight = maxSize
+        if (width > height) finalHeight = (maxSize / ratio).toInt()
+        else finalWidth = (maxSize * ratio).toInt()
+        return Bitmap.createScaledBitmap(bitmap, finalWidth, finalHeight, true)
     }
 
     fun sharePost(originalPost: Post, sharedText: String) {

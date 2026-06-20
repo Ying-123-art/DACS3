@@ -1,9 +1,7 @@
 package com.example.giuaky
 
 import android.Manifest
-import android.content.Context
 import android.net.Uri
-import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
@@ -27,13 +25,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.giuaky.viewmodel.PostViewModel
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +39,6 @@ fun CreateScreen(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,28 +52,6 @@ fun CreateScreen(
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) imageUri = uri
-    }
-
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) {
-            imageUri = tempCameraUri
-        }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            try {
-                val uri = createImageUri(context)
-                tempCameraUri = uri
-                uri?.let { cameraLauncher.launch(it) }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Lỗi khi mở máy ảnh", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            Toast.makeText(context, "Cần quyền truy cập máy ảnh để chụp hình", Toast.LENGTH_SHORT).show()
-        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -136,12 +108,21 @@ fun CreateScreen(
             // Location chip
             if (uiState.locationName.isNotEmpty()) {
                 AssistChip(
-                    onClick = { viewModel.clearLocation() },
+                    onClick = { /* Có thể thêm logic zoom vào map */ },
                     label = { Text(uiState.locationName) },
                     leadingIcon = { Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp)) },
                     trailingIcon = {
-                        Text("✕", color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelSmall)
+                        IconButton(
+                            onClick = { viewModel.clearLocation() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Xóa vị trí",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 )
                 Spacer(Modifier.height(8.dp))
@@ -150,7 +131,12 @@ fun CreateScreen(
             // Image preview
             imageUri?.let { uri ->
                 Image(
-                    painter = rememberAsyncImagePainter(uri),
+                    painter = rememberAsyncImagePainter(
+                        model = ImageRequest.Builder(context)
+                            .data(uri)
+                            .crossfade(true)
+                            .build()
+                    ),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -173,21 +159,7 @@ fun CreateScreen(
                 ) {
                     Icon(Icons.Default.Image, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Thư viện", maxLines = 1)
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !uiState.isLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Icon(Icons.Default.CameraAlt, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Chụp ảnh", maxLines = 1)
+                    Text("Chọn ảnh", maxLines = 1)
                 }
 
                 OutlinedButton(
@@ -220,39 +192,25 @@ fun CreateScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(8.dp))
-                        Text("Đang đăng bài...", style = MaterialTheme.typography.bodySmall)
+                        Text("Đang tải ảnh và đăng bài...", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             } else {
                 Button(
-                    onClick = { viewModel.createPost(title, content, imageUri) },
+                    onClick = { 
+                        if (content.isNotBlank()) {
+                            viewModel.createPost(context, title, content, imageUri)
+                        } else {
+                            Toast.makeText(context, "Vui lòng nhập nội dung", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    enabled = content.isNotEmpty(),
+                    enabled = content.isNotEmpty() && !uiState.isLoading,
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Đăng Bài", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
-    }
-}
-
-private fun createImageUri(context: Context): Uri? {
-    return try {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        if (storageDir?.exists() == false) storageDir.mkdirs()
-        
-        val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
-        
-        // Sử dụng authority khớp chính xác với Manifest
-        FileProvider.getUriForFile(
-            context,
-            "com.example.giuaky.fileprovider",
-            file
-        )
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
     }
 }

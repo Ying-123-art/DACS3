@@ -3,8 +3,11 @@ package com.example.giuaky.viewmodel
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.location.Geocoder
 import android.net.Uri
+import android.util.Base64
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -14,11 +17,14 @@ import com.example.giuaky.data.repository.PostRepository
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.util.Locale
 
 data class PostUiState(
@@ -44,22 +50,28 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun createPost(title: String, content: String, imageUri: Uri?) {
+    fun createPost(context: Context, title: String, content: String, imageUri: Uri?) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            
+            val base64Image = if (imageUri != null) {
+                uriToBase64(context, imageUri)
+            } else ""
+
             val authorName = user.displayName ?: user.email?.substringBefore("@") ?: "Người dùng"
             val post = Post(
                 userId = user.uid,
                 authorName = authorName,
                 title = title,
                 content = content,
+                imageUrl = base64Image,
                 location = _uiState.value.locationName,
                 latitude = _uiState.value.latitude,
                 longitude = _uiState.value.longitude,
                 timestamp = System.currentTimeMillis()
             )
-            val result = repository.createPost(post, imageUri)
+            val result = repository.createPost(post)
             result.fold(
                 onSuccess = { _uiState.update { it.copy(isLoading = false, isSuccess = true) } },
                 onFailure = { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
@@ -67,10 +79,17 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun updatePost(postId: String, title: String, content: String, existingImageUrl: String, newImageUri: Uri?) {
+    fun updatePost(context: Context, postId: String, title: String, content: String, existingImageUrl: String, newImageUri: Uri?) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = repository.updatePost(postId, title, content, existingImageUrl, newImageUri)
+            
+            val finalBase64 = if (newImageUri != null) {
+                uriToBase64(context, newImageUri)
+            } else {
+                existingImageUrl
+            }
+
+            val result = repository.updatePost(postId, title, content, finalBase64)
             result.fold(
                 onSuccess = { _uiState.update { it.copy(isLoading = false, isSuccess = true) } },
                 onFailure = { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
@@ -78,10 +97,66 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun deletePost(postId: String, imageUrl: String) {
+    private suspend fun uriToBase64(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
+        try {
+            // Step 1: Get dimensions of image to calculate sample size
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+
+            // Step 2: Calculate inSampleSize (Target roughly 800px)
+            var inSampleSize = 1
+            val targetSize = 800
+            if (options.outHeight > targetSize || options.outWidth > targetSize) {
+                val halfHeight = options.outHeight / 2
+                val halfWidth = options.outWidth / 2
+                while (halfHeight / inSampleSize >= targetSize && halfWidth / inSampleSize >= targetSize) {
+                    inSampleSize *= 2
+                }
+            }
+
+            // Step 3: Decode with inSampleSize
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = inSampleSize }
+            val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, decodeOptions)
+            } ?: return@withContext ""
+
+            // Step 4: Final Resize and Compress
+            val scaledBitmap = scaleBitmap(bitmap)
+            val outputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
+            val byteArray = outputStream.toByteArray()
+
+            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun scaleBitmap(bitmap: Bitmap): Bitmap {
+        val maxWidth = 640
+        val maxHeight = 640
+        val width = bitmap.width
+        val height = bitmap.height
+        
+        if (width <= maxWidth && height <= maxHeight) return bitmap
+        
+        val ratio: Float = width.toFloat() / height.toFloat()
+        var finalWidth = maxWidth
+        var finalHeight = maxHeight
+        
+        if (width > height) {
+            finalHeight = (maxWidth / ratio).toInt()
+        } else {
+            finalWidth = (maxHeight * ratio).toInt()
+        }
+        
+        return Bitmap.createScaledBitmap(bitmap, finalWidth, finalHeight, true)
+    }
+
+    fun deletePost(postId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            repository.deletePost(postId, imageUrl)
+            repository.deletePost(postId)
             _uiState.update { it.copy(isLoading = false, isSuccess = true) }
         }
     }

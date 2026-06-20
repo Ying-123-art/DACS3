@@ -1,6 +1,5 @@
 package com.example.giuaky.data.repository
 
-import android.net.Uri
 import com.example.giuaky.data.model.Notification
 import com.example.giuaky.data.model.Post
 import com.example.giuaky.data.model.User
@@ -8,23 +7,20 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 class PostRepository {
     private val db = FirebaseDatabase.getInstance().getReference("posts")
-    private val storage = FirebaseStorage.getInstance().reference
     private val notificationRepo = NotificationRepository()
 
     fun getAllPosts(): Flow<List<Post>> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val posts = snapshot.children.mapNotNull { data ->
-                    data.getValue(Post::class.java)?.copy(id = data.key ?: "")
+                    data.getValue(Post::class.java)?.apply { id = data.key ?: "" }
                 }.sortedByDescending { it.timestamp }
                 trySend(posts)
             }
@@ -39,7 +35,7 @@ class PostRepository {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val posts = snapshot.children.mapNotNull { data ->
-                    data.getValue(Post::class.java)?.copy(id = data.key ?: "")
+                    data.getValue(Post::class.java)?.apply { id = data.key ?: "" }
                 }.sortedByDescending { it.timestamp }
                 trySend(posts)
             }
@@ -52,15 +48,17 @@ class PostRepository {
     suspend fun getPost(postId: String): Post? {
         return try {
             val snapshot = db.child(postId).get().await()
-            snapshot.getValue(Post::class.java)?.copy(id = postId)
+            snapshot.getValue(Post::class.java)?.apply { id = postId }
         } catch (e: Exception) { null }
     }
 
-    suspend fun createPost(post: Post, imageUri: Uri?): Result<Unit> {
+    suspend fun createPost(post: Post): Result<Unit> {
         return try {
             val postId = db.push().key ?: return Result.failure(Exception("Lỗi tạo ID"))
-            val imageUrl = if (imageUri != null) uploadImage(imageUri) else ""
-            val newPost = post.copy(id = postId, imageUrl = imageUrl, status = "pending")
+            val newPost = post.apply { 
+                id = postId
+                status = "pending" 
+            }
             db.child(postId).setValue(newPost).await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -83,7 +81,7 @@ class PostRepository {
                 latitude = originalPost.latitude,
                 longitude = originalPost.longitude,
                 timestamp = System.currentTimeMillis(),
-                status = "approved", // Shared posts are usually approved immediately if original was
+                status = "approved", 
                 isShared = true,
                 originalPostId = originalPost.id,
                 sharedContent = sharedText,
@@ -91,7 +89,6 @@ class PostRepository {
             )
             db.child(postId).setValue(sharedPost).await()
 
-            // Notify original author
             val notification = Notification(
                 toUserId = originalPost.userId,
                 fromUserId = currentUserId,
@@ -110,13 +107,12 @@ class PostRepository {
         }
     }
 
-    suspend fun updatePost(postId: String, title: String, content: String, imageUrl: String, newImageUri: Uri?): Result<Unit> {
+    suspend fun updatePost(postId: String, title: String, content: String, imageUrl: String): Result<Unit> {
         return try {
-            val finalImageUrl = if (newImageUri != null) uploadImage(newImageUri) else imageUrl
             val updates = mapOf(
                 "title" to title,
                 "content" to content,
-                "imageUrl" to finalImageUrl,
+                "imageUrl" to imageUrl,
                 "status" to "pending"
             )
             db.child(postId).updateChildren(updates).await()
@@ -135,12 +131,9 @@ class PostRepository {
         }
     }
 
-    suspend fun deletePost(postId: String, imageUrl: String): Result<Unit> {
+    suspend fun deletePost(postId: String): Result<Unit> {
         return try {
             db.child(postId).removeValue().await()
-            if (imageUrl.isNotEmpty() && !imageUrl.contains("original")) { // Simplistic check to avoid deleting original images if it's a share
-                try { storage.storage.getReferenceFromUrl(imageUrl).delete().await() } catch (_: Exception) {}
-            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -185,27 +178,5 @@ class PostRepository {
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    suspend fun getAllPostsOnce(): List<Post> {
-        return try {
-            val snapshot = db.get().await()
-            snapshot.children.mapNotNull { data ->
-                data.getValue(Post::class.java)?.copy(id = data.key ?: "")
-            }
-        } catch (e: Exception) { emptyList() }
-    }
-
-    suspend fun getAllUsersCount(): Int {
-        return try {
-            val snapshot = FirebaseDatabase.getInstance().getReference("users").get().await()
-            snapshot.childrenCount.toInt()
-        } catch (e: Exception) { 0 }
-    }
-
-    private suspend fun uploadImage(uri: Uri): String {
-        val ref = storage.child("images/${UUID.randomUUID()}.jpg")
-        ref.putFile(uri).await()
-        return ref.downloadUrl.await().toString()
     }
 }

@@ -26,11 +26,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.giuaky.data.model.Post
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,8 +51,8 @@ fun PostCard(
     val isLiked = post.likedBy.containsKey(currentUserId)
     val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     val dateString = sdf.format(Date(post.timestamp))
+    val context = LocalContext.current
 
-    // Like animation
     var likeClicked by remember { mutableStateOf(false) }
     val likeScale by animateFloatAsState(
         targetValue = if (likeClicked) 1.3f else 1f,
@@ -79,9 +81,10 @@ fun PostCard(
             ) {
                 Image(
                     painter = rememberAsyncImagePainter(
-                        model = post.authorAvatarUrl.ifEmpty {
-                            "https://ui-avatars.com/api/?name=${post.authorName.replace(" ", "+")}&background=2E7D32&color=fff&size=128"
-                        }
+                        model = ImageRequest.Builder(context)
+                            .data(post.authorAvatarUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.authorName.replace(" ", "+")}&background=2E7D32&color=fff" })
+                            .crossfade(true)
+                            .build()
                     ),
                     contentDescription = "Avatar",
                     modifier = Modifier.size(44.dp).clip(CircleShape),
@@ -89,173 +92,105 @@ fun PostCard(
                 )
                 Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
                     Text(text = post.authorName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = dateString, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        if (post.location.isNotEmpty() && !post.isShared) {
-                            Text(" · ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                            Row(
-                                modifier = Modifier.clickable { 
-                                    if (post.latitude != 0.0 && post.longitude != 0.0) {
-                                        onLocationClick(post.latitude, post.longitude)
-                                    }
-                                },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.LocationOn, null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.primary)
-                                Text(text = post.location, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
+                    Text(text = dateString, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 if (post.userId == currentUserId && !post.isShared) {
                     IconButton(onClick = onEditClick) {
-                        Icon(Icons.Default.MoreVert, null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                     }
                 }
             }
 
-            // Shared content (user's caption for shared post)
-            if (post.isShared && post.sharedContent.isNotEmpty()) {
-                Text(
-                    text = post.sharedContent,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(Modifier.height(8.dp))
+            // Title & Content
+            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                if (post.title.isNotEmpty()) {
+                    Text(text = post.title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                    Spacer(Modifier.height(4.dp))
+                }
+                if (post.content.isNotEmpty()) {
+                    Text(text = post.content, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // HIỂN THỊ VỊ TRÍ (LOCATION)
+            if (!post.location.isNullOrEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(bottom = 8.dp)
+                        .clickable { onLocationClick(post.latitude, post.longitude) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = post.location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            // Original Post Container (if shared)
-            Box(
-                modifier = if (post.isShared) {
-                    Modifier
-                        .padding(horizontal = 12.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                        .padding(8.dp)
-                } else Modifier
-            ) {
-                Column {
-                    if (post.isShared) {
-                        Text(
-                            text = "Đã chia sẻ bài viết của ${post.originalAuthorName}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontStyle = FontStyle.Italic,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
+            // HIỂN THỊ ẢNH TỪ BASE64
+            if (post.imageUrl.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
 
-                    // Title & Content
-                    if (post.title.isNotEmpty()) {
-                        Text(
-                            text = post.title,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 17.sp,
-                            modifier = Modifier.padding(horizontal = if (post.isShared) 0.dp else 12.dp)
-                        )
-                        Spacer(Modifier.height(4.dp))
-                    }
-                    if (post.content.isNotEmpty()) {
-                        Text(
-                            text = post.content,
-                            modifier = Modifier.padding(horizontal = if (post.isShared) 0.dp else 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                        )
-                    }
-
-                    // Image
-                    if (post.imageUrl.isNotEmpty()) {
-                        Spacer(Modifier.height(10.dp))
-                        Image(
-                            painter = rememberAsyncImagePainter(post.imageUrl),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 180.dp, max = 360.dp)
-                                .then(if (post.isShared) Modifier.clip(RoundedCornerShape(8.dp)) else Modifier),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                    
-                    if (post.isShared && post.location.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.clickable { 
-                                if (post.latitude != 0.0 && post.longitude != 0.0) {
-                                    onLocationClick(post.latitude, post.longitude)
-                                }
-                            },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.LocationOn, null,
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(4.dp))
-                            Text(text = post.location, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary)
+                // Ghi nhớ và xử lý dữ liệu ảnh để không bị decode lại nhiều lần khi Recomposition
+                val imageModel = remember(post.imageUrl) {
+                    if (post.imageUrl.startsWith("http")) {
+                        // Nếu là link web bình thường, giữ nguyên chuỗi
+                        post.imageUrl
+                    } else {
+                        // Nếu là Base64
+                        try {
+                            // Xoá bỏ tiền tố (nếu có) trước khi decode
+                            val cleanBase64 = post.imageUrl.substringAfter("base64,")
+                            // Decode thành mảng Byte cho Coil đọc
+                            android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            null // Trả về null nếu decode lỗi để Coil không crash
                         }
                     }
                 }
-            }
 
-            // Likes count
-            if (post.likesCount > 0 || post.commentsCount > 0) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (post.likesCount > 0) {
-                        Text("${post.likesCount} lượt thích",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    }
-                    if (post.commentsCount > 0) {
-                        Text("${post.commentsCount} bình luận",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    }
-                }
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        model = ImageRequest.Builder(context)
+                            .data(imageModel) // Truyền ByteArray hoặc String (URL) đã xử lý vào
+                            .crossfade(true)
+                            .build()
+                    ),
+                    contentDescription = "Post image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 180.dp, max = 400.dp)
+                        .padding(horizontal = 8.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
             }
-
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
             // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TextButton(onClick = {
-                    likeClicked = true
-                    onLikeClick()
-                }) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = likeColor,
-                        modifier = Modifier.size(20.dp).scale(likeScale)
-                    )
+            Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TextButton(onClick = { likeClicked = true; onLikeClick() }) {
+                    Icon(imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = null, tint = likeColor, modifier = Modifier.size(20.dp).scale(likeScale))
                     Spacer(Modifier.width(4.dp))
-                    Text("Thích", color = likeColor, fontWeight = if (isLiked) FontWeight.Bold else FontWeight.Normal)
+                    Text("Thích", color = likeColor)
                 }
                 TextButton(onClick = onCommentClick) {
-                    Icon(Icons.Default.ChatBubbleOutline, null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Icon(Icons.Default.ChatBubbleOutline, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                     Spacer(Modifier.width(4.dp))
                     Text("Bình luận", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
-                TextButton(onClick = onShareClick) {
-                    Icon(Icons.Default.Share, null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Chia sẻ", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                }
+
             }
         }
     }

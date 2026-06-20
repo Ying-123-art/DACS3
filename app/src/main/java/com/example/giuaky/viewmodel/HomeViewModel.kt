@@ -36,7 +36,14 @@ class HomeViewModel(context: Context) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
         _posts, _isLoading, _searchQuery, _mapFocusPoint, _currentUserId, _error
-    ) { posts, isLoading, searchQuery, mapFocusPoint, currentUserId, error ->
+    ) { args ->
+        val posts = args[0] as List<Post>
+        val isLoading = args[1] as Boolean
+        val searchQuery = args[2] as String
+        val mapFocusPoint = args[3] as Pair<Double, Double>?
+        val currentUserId = args[4] as String
+        val error = args[5] as String?
+
         val filtered = if (searchQuery.isBlank()) {
             posts
         } else {

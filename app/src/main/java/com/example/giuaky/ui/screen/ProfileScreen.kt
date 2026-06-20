@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,15 +36,15 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onBack: () -> Unit,
     onNavigateToMap: (Double, Double) -> Unit,
-    onShareClick: (Post, String) -> Unit // Thêm callback chia sẻ bài viết
+    onShareClick: (Post, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     var isEditing by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
     
-    // State cho việc chia sẻ bài viết
     var sharingPost by remember { mutableStateOf<Post?>(null) }
     var shareText by remember { mutableStateOf("") }
 
@@ -59,10 +60,9 @@ fun ProfileScreen(
     }
 
     val avatarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { viewModel.uploadAvatar(currentUid, it) }
+        uri?.let { viewModel.uploadAvatar(context, currentUid, it) }
     }
 
-    // Share Dialog tương tự HomeScreen
     sharingPost?.let { post ->
         AlertDialog(
             onDismissRequest = { sharingPost = null },
@@ -242,11 +242,11 @@ fun ProfileScreen(
                     PostCard(
                         post = post,
                         currentUserId = currentUid,
-                        onEditClick = {}, // Có thể thêm logic edit nếu cần
-                        onLikeClick = {}, // Có thể thêm logic like trong profile
+                        onEditClick = {}, 
+                        onLikeClick = {}, 
                         onCommentClick = {},
                         onLocationClick = { lat, lon -> onNavigateToMap(lat, lon) },
-                        onShareClick = { sharingPost = post } // Kích hoạt dialog chia sẻ
+                        onShareClick = { sharingPost = post }
                     )
                 }
             }

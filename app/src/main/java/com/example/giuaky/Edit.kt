@@ -1,10 +1,6 @@
 package com.example.giuaky
 
-import android.Manifest
-import android.content.Context
 import android.net.Uri
-import android.os.Environment
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -15,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,13 +21,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
 import com.example.giuaky.viewmodel.PostViewModel
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +35,6 @@ fun EditScreen(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var newImageUri by remember { mutableStateOf<Uri?>(null) }
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
@@ -72,24 +62,6 @@ fun EditScreen(
         if (uri != null) newImageUri = uri
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) {
-            newImageUri = tempCameraUri
-        }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            val uri = createImageUri(context)
-            tempCameraUri = uri
-            uri?.let { cameraLauncher.launch(it) }
-        } else {
-            Toast.makeText(context, "Cần quyền Camera để chụp ảnh", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -99,7 +71,7 @@ fun EditScreen(
                 Button(
                     onClick = {
                         showDeleteDialog = false
-                        viewModel.deletePost(postId, uiState.post?.imageUrl ?: "")
+                        viewModel.deletePost(postId)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Xóa") }
@@ -149,13 +121,15 @@ fun EditScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                val displayImageUrl = newImageUri?.toString() ?: uiState.post?.imageUrl ?: ""
-                if (displayImageUrl.isNotEmpty()) {
+                val displayImage = newImageUri ?: uiState.post?.imageUrl.takeIf { it?.isNotEmpty() == true }
+                
+                if (displayImage != null) {
                     Image(
-                        painter = rememberAsyncImagePainter(displayImageUrl),
+                        painter = rememberAsyncImagePainter(displayImage),
                         contentDescription = null,
                         modifier = Modifier
-                            .fillMaxWidth().height(220.dp)
+                            .fillMaxWidth()
+                            .height(220.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                         contentScale = ContentScale.Crop
@@ -163,28 +137,15 @@ fun EditScreen(
                     Spacer(Modifier.height(12.dp))
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { galleryLauncher.launch("image/*") },
-                        modifier = Modifier.weight(1f),
-                        enabled = !uiState.isLoading,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Image, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Thư viện")
-                    }
-
-                    OutlinedButton(
-                        onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
-                        modifier = Modifier.weight(1f),
-                        enabled = !uiState.isLoading,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.CameraAlt, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Chụp ảnh")
-                    }
+                OutlinedButton(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Image, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Thay đổi ảnh")
                 }
 
                 uiState.error?.let {
@@ -201,7 +162,14 @@ fun EditScreen(
                 } else {
                     Button(
                         onClick = {
-                            viewModel.updatePost(postId, title, content, uiState.post?.imageUrl ?: "", newImageUri)
+                            viewModel.updatePost(
+                                context,
+                                postId,
+                                title,
+                                content,
+                                uiState.post?.imageUrl ?: "",
+                                newImageUri
+                            )
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         enabled = title.isNotEmpty() || content.isNotEmpty(),
@@ -224,17 +192,5 @@ fun EditScreen(
                 }
             }
         }
-    }
-}
-
-private fun createImageUri(context: Context): Uri? {
-    return try {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        if (storageDir?.exists() == false) storageDir.mkdirs()
-        val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
-        FileProvider.getUriForFile(context, "com.example.giuaky.fileprovider", file)
-    } catch (e: Exception) {
-        null
     }
 }

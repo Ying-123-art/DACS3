@@ -39,22 +39,16 @@ class AdminViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState.asStateFlow()
 
-    val pendingPosts: StateFlow<List<Post>> = uiState.map { state ->
-        state.allPosts.filter { it.status == "pending" }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
     init {
         loadData()
     }
 
     private fun loadData() {
-        // Load users once separately
         viewModelScope.launch {
             val usersResult = userRepo.getAllUsers()
             val users = usersResult.getOrDefault(emptyList())
             _uiState.update { it.copy(allUsers = users) }
         }
-        // Listen to posts realtime
         viewModelScope.launch {
             postRepo.getAllPosts().collect { posts ->
                 val today = Calendar.getInstance().apply {
@@ -97,7 +91,7 @@ class AdminViewModel : ViewModel() {
 
     fun deletePost(postId: String, imageUrl: String) {
         viewModelScope.launch {
-            postRepo.deletePost(postId, imageUrl)
+            postRepo.deletePost(postId)
         }
     }
 }
