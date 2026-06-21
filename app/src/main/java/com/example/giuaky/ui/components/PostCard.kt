@@ -5,8 +5,11 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,6 +64,15 @@ fun PostCard(
         targetValue = if (isLiked) Color(0xFFE53935) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
         label = "likeColor"
     )
+
+    // Lấy danh sách ảnh để hiển thị (tương thích bài cũ và bài mới)
+    val displayImages = remember(post.imageUrls, post.imageUrl) {
+        if (post.imageUrls.isNotEmpty()) post.imageUrls 
+        else if (post.imageUrl.isNotEmpty()) listOf(post.imageUrl) 
+        else emptyList()
+    }
+    
+    val pagerState = rememberPagerState(pageCount = { displayImages.size })
 
     Card(
         modifier = modifier
@@ -144,38 +156,78 @@ fun PostCard(
                 }
             }
 
-            // Image Display
-            if (post.imageUrl.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
+            // Multiple Images Display with Pager
+            if (displayImages.isNotEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) { page ->
+                        val imageUrl = displayImages[page]
+                        val imageModel = remember(imageUrl) {
+                            if (imageUrl.startsWith("http")) imageUrl
+                            else {
+                                try {
+                                    val cleanBase64 = imageUrl.substringAfter("base64,")
+                                    android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                                } catch (e: Exception) { null }
+                            }
+                        }
 
-                val imageModel = remember(post.imageUrl) {
-                    if (post.imageUrl.startsWith("http")) {
-                        post.imageUrl
-                    } else {
-                        try {
-                            val cleanBase64 = post.imageUrl.substringAfter("base64,")
-                            android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
-                        } catch (e: Exception) {
-                            null
+                        Image(
+                            painter = rememberAsyncImagePainter(
+                                model = ImageRequest.Builder(context)
+                                    .data(imageModel)
+                                    .crossfade(true)
+                                    .build()
+                            ),
+                            contentDescription = "Post image ${page + 1}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    // Indicator and count overlay (chỉ hiện nếu có nhiều hơn 1 ảnh)
+                    if (displayImages.size > 1) {
+                        // Dot indicators
+                        Row(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp)
+                                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            repeat(displayImages.size) { iteration ->
+                                val color = if (pagerState.currentPage == iteration) Color.White else Color.White.copy(alpha = 0.5f)
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                )
+                            }
+                        }
+                        
+                        // Count badge top-right
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp),
+                            color = Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "${pagerState.currentPage + 1}/${displayImages.size}",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
-
-                Image(
-                    painter = rememberAsyncImagePainter(
-                        model = ImageRequest.Builder(context)
-                            .data(imageModel)
-                            .crossfade(true)
-                            .build()
-                    ),
-                    contentDescription = "Post image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 180.dp, max = 400.dp)
-                        .padding(horizontal = 8.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
             }
 
             // Likes and Comments Count

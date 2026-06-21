@@ -76,7 +76,7 @@ class PostRepository {
                 authorAvatarUrl = currentUser.avatarUrl,
                 title = originalPost.title,
                 content = originalPost.content,
-                imageUrl = originalPost.imageUrl,
+                imageUrls = originalPost.imageUrls,
                 location = originalPost.location,
                 latitude = originalPost.latitude,
                 longitude = originalPost.longitude,
@@ -107,12 +107,12 @@ class PostRepository {
         }
     }
 
-    suspend fun updatePost(postId: String, title: String, content: String, imageUrl: String): Result<Unit> {
+    suspend fun updatePost(postId: String, title: String, content: String, imageUrls: List<String>): Result<Unit> {
         return try {
             val updates = mapOf(
                 "title" to title,
                 "content" to content,
-                "imageUrl" to imageUrl,
+                "imageUrls" to imageUrls,
                 "status" to "pending"
             )
             db.child(postId).updateChildren(updates).await()
@@ -125,6 +125,25 @@ class PostRepository {
     suspend fun updatePostStatus(postId: String, status: String): Result<Unit> {
         return try {
             db.child(postId).child("status").setValue(status).await()
+            if (status == "approved") {
+                val post = getPost(postId)
+                if (post != null) {
+                    val followers = UserRepository().getFollowers(post.userId)
+                    followers.forEach { followerId ->
+                        val notification = Notification(
+                            toUserId = followerId,
+                            fromUserId = post.userId,
+                            fromUserName = post.authorName,
+                            fromUserAvatar = post.authorAvatarUrl,
+                            postId = post.id,
+                            type = "new_post",
+                            content = "vừa đăng bài viết mới: ${post.title}",
+                            timestamp = System.currentTimeMillis()
+                        )
+                        notificationRepo.addNotification(notification)
+                    }
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

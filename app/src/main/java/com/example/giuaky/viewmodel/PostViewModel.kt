@@ -50,22 +50,23 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun createPost(context: Context, title: String, content: String, imageUri: Uri?) {
+    fun createPost(context: Context, title: String, content: String, imageUris: List<Uri>) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            val base64Image = if (imageUri != null) {
-                uriToBase64(context, imageUri)
-            } else ""
+            val base64Images = imageUris.take(4).map { uri ->
+                uriToBase64(context, uri)
+            }.filter { it.isNotEmpty() }
 
             val authorName = user.displayName ?: user.email?.substringBefore("@") ?: "Người dùng"
             val post = Post(
                 userId = user.uid,
                 authorName = authorName,
+                authorAvatarUrl = user.photoUrl?.toString() ?: "",
                 title = title,
                 content = content,
-                imageUrl = base64Image,
+                imageUrls = base64Images,
                 location = _uiState.value.locationName,
                 latitude = _uiState.value.latitude,
                 longitude = _uiState.value.longitude,
@@ -79,17 +80,19 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun updatePost(context: Context, postId: String, title: String, content: String, existingImageUrl: String, newImageUri: Uri?) {
+    fun updatePost(context: Context, postId: String, title: String, content: String, existingImageUrls: List<String>, newImageUris: List<Uri>) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             
-            val finalBase64 = if (newImageUri != null) {
-                uriToBase64(context, newImageUri)
-            } else {
-                existingImageUrl
-            }
+            val newBase64Images = newImageUris.map { uri ->
+                uriToBase64(context, uri)
+            }.filter { it.isNotEmpty() }
+            
+            // For simplicity, we combine them up to 4 images
+            val finalImageUrls = (existingImageUrls + newBase64Images).take(4)
 
-            val result = repository.updatePost(postId, title, content, finalBase64)
+            val result = repository.updatePost(postId, title, content, finalImageUrls)
+            
             result.fold(
                 onSuccess = { _uiState.update { it.copy(isLoading = false, isSuccess = true) } },
                 onFailure = { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
@@ -99,11 +102,9 @@ class PostViewModel : ViewModel() {
 
     private suspend fun uriToBase64(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
         try {
-            // Step 1: Get dimensions of image to calculate sample size
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
 
-            // Step 2: Calculate inSampleSize (Target roughly 800px)
             var inSampleSize = 1
             val targetSize = 800
             if (options.outHeight > targetSize || options.outWidth > targetSize) {
@@ -114,19 +115,17 @@ class PostViewModel : ViewModel() {
                 }
             }
 
-            // Step 3: Decode with inSampleSize
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = inSampleSize }
             val bitmap = context.contentResolver.openInputStream(uri)?.use {
                 BitmapFactory.decodeStream(it, null, decodeOptions)
             } ?: return@withContext ""
 
-            // Step 4: Final Resize and Compress
             val scaledBitmap = scaleBitmap(bitmap)
             val outputStream = ByteArrayOutputStream()
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
             val byteArray = outputStream.toByteArray()
 
-            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+            "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
         } catch (e: Exception) {
             ""
         }
