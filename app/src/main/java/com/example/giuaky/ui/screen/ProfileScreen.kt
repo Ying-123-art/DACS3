@@ -1,5 +1,6 @@
 package com.example.giuaky.ui.screen
 
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.giuaky.data.model.Post
 import com.example.giuaky.ui.components.PostCard
 import com.example.giuaky.viewmodel.ProfileViewModel
@@ -67,6 +69,23 @@ fun ProfileScreen(
         uri?.let { viewModel.uploadAvatar(context, currentUid, it) }
     }
 
+    // Logic xử lý avatar model (URL hoặc Base64)
+    val avatarModel = remember(uiState.user?.avatarUrl) {
+        val url = uiState.user?.avatarUrl ?: ""
+        if (url.isEmpty()) {
+            "https://ui-avatars.com/api/?name=${(uiState.user?.displayName ?: "U").replace(" ", "+")}&background=2E7D32&color=fff&size=256"
+        } else if (url.startsWith("http")) {
+            url
+        } else {
+            try {
+                val cleanBase64 = url.substringAfter("base64,")
+                Base64.decode(cleanBase64, Base64.DEFAULT)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -106,9 +125,10 @@ fun ProfileScreen(
                     Box {
                         Image(
                             painter = rememberAsyncImagePainter(
-                                model = uiState.user?.avatarUrl?.ifEmpty {
-                                    "https://ui-avatars.com/api/?name=${(uiState.user?.displayName ?: "U").replace(" ", "+")}&background=2E7D32&color=fff&size=256"
-                                } ?: "https://ui-avatars.com/api/?name=U&background=2E7D32&color=fff&size=256"
+                                model = ImageRequest.Builder(context)
+                                    .data(avatarModel)
+                                    .crossfade(true)
+                                    .build()
                             ),
                             contentDescription = "Avatar",
                             modifier = Modifier.size(100.dp).clip(CircleShape),
@@ -224,6 +244,8 @@ fun ProfileScreen(
                     PostCard(
                         post = post,
                         currentUserId = currentUid,
+                        authorAvatarUrl = uiState.user?.avatarUrl ?: post.authorAvatarUrl, // Ghi đè bằng avatar mới nhất từ Profile
+                        authorName = uiState.user?.displayName ?: post.authorName, // Ghi đè bằng tên mới nhất
                         onAuthorClick = { authorId ->
                             if (authorId != targetUid) onNavigateToOtherProfile(authorId)
                         },

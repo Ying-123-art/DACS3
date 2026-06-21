@@ -197,6 +197,9 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToPost = { postId ->
                     navController.navigate(NavRoutes.commentsRoute(postId))
                 },
+                onNavigateToUserProfile = { userId ->
+                    navController.navigate(NavRoutes.profileRoute(userId))
+                },
                 onBack = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(NavRoutes.HOME) },
                 onNavigateToMap = { navController.navigate(NavRoutes.mapRoute()) },

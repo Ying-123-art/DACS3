@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.giuaky.data.local.AppDatabase
 import com.example.giuaky.data.local.PostEntity
 import com.example.giuaky.data.model.Post
+import com.example.giuaky.data.model.User
 import com.example.giuaky.data.repository.PostRepository
 import com.example.giuaky.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val posts: List<Post> = emptyList(),
     val filteredPosts: List<Post> = emptyList(),
+    val users: Map<String, User> = emptyMap(), // Lưu map userId -> User
     val isLoading: Boolean = true,
     val searchQuery: String = "",
     val currentUserId: String = "",
@@ -28,6 +30,7 @@ class HomeViewModel(context: Context) : ViewModel() {
     private val postDao = AppDatabase.getInstance(context).postDao()
     
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    private val _users = MutableStateFlow<Map<String, User>>(emptyMap())
     private val _isLoading = MutableStateFlow(true)
     private val _searchQuery = MutableStateFlow("")
     private val _mapFocusPoint = MutableStateFlow<Pair<Double, Double>?>(null)
@@ -35,7 +38,7 @@ class HomeViewModel(context: Context) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<HomeUiState> = combine(
-        _posts, _isLoading, _searchQuery, _mapFocusPoint, _currentUserId, _error
+        _posts, _isLoading, _searchQuery, _mapFocusPoint, _currentUserId, _error, _users
     ) { args ->
         val posts = args[0] as List<Post>
         val isLoading = args[1] as Boolean
@@ -43,6 +46,7 @@ class HomeViewModel(context: Context) : ViewModel() {
         val mapFocusPoint = args[3] as Pair<Double, Double>?
         val currentUserId = args[4] as String
         val error = args[5] as String?
+        val usersMap = args[6] as Map<String, User>
 
         val filtered = if (searchQuery.isBlank()) {
             posts
@@ -58,6 +62,7 @@ class HomeViewModel(context: Context) : ViewModel() {
         HomeUiState(
             posts = posts,
             filteredPosts = filtered,
+            users = usersMap,
             isLoading = isLoading,
             searchQuery = searchQuery,
             currentUserId = currentUserId,
@@ -72,7 +77,16 @@ class HomeViewModel(context: Context) : ViewModel() {
 
     init {
         loadPosts()
+        loadUsers()
         observeCachedPosts(context)
+    }
+
+    private fun loadUsers() {
+        viewModelScope.launch {
+            userRepository.getAllUsers().onSuccess { userList ->
+                _users.value = userList.associateBy { it.uid }
+            }
+        }
     }
 
     private fun observeCachedPosts(context: Context) {

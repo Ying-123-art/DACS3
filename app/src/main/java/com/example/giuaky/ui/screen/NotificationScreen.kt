@@ -1,5 +1,6 @@
 package com.example.giuaky.ui.screen
 
+import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,21 +13,26 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.giuaky.data.model.Notification
+import com.example.giuaky.data.model.User
 import com.example.giuaky.navigation.NavRoutes
 import com.example.giuaky.ui.components.BottomNavBar
 import com.example.giuaky.viewmodel.NotificationViewModel
@@ -38,6 +44,7 @@ import java.util.*
 fun NotificationScreen(
     viewModel: NotificationViewModel,
     onNavigateToPost: (String) -> Unit,
+    onNavigateToUserProfile: (String) -> Unit,
     onBack: () -> Unit,
     onNavigateToHome: () -> Unit,
     onNavigateToMap: () -> Unit,
@@ -93,11 +100,19 @@ fun NotificationScreen(
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 items(uiState.notifications, key = { it.id }) { notification ->
+                    // Lấy user mới nhất từ Map
+                    val latestUser = uiState.users[notification.fromUserId]
+                    
                     NotificationItem(
                         notification = notification,
+                        latestUser = latestUser,
                         onClick = {
                             viewModel.markAsRead(notification.id)
-                            onNavigateToPost(notification.postId)
+                            if (notification.type == "follow") {
+                                onNavigateToUserProfile(notification.fromUserId)
+                            } else if (notification.postId.isNotEmpty()) {
+                                onNavigateToPost(notification.postId)
+                            }
                         }
                     )
                     HorizontalDivider(
@@ -114,10 +129,31 @@ fun NotificationScreen(
 @Composable
 fun NotificationItem(
     notification: Notification,
+    latestUser: User?,
     onClick: () -> Unit
 ) {
     val sdf = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
     val dateString = sdf.format(Date(notification.timestamp))
+    val context = LocalContext.current
+
+    // Ưu tiên dùng thông tin từ User Profile mới nhất
+    val avatarUrl = latestUser?.avatarUrl ?: notification.fromUserAvatar
+    val fromUserName = latestUser?.displayName ?: notification.fromUserName
+
+    val avatarModel = remember(avatarUrl) {
+        if (avatarUrl.isEmpty()) {
+            "https://ui-avatars.com/api/?name=${fromUserName.replace(" ", "+")}&background=2E7D32&color=fff"
+        } else if (avatarUrl.startsWith("http")) {
+            avatarUrl
+        } else {
+            try {
+                val cleanBase64 = avatarUrl.substringAfter("base64,")
+                Base64.decode(cleanBase64, Base64.DEFAULT)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     Row(
         modifier = Modifier
@@ -130,9 +166,10 @@ fun NotificationItem(
         Box(contentAlignment = Alignment.BottomEnd) {
             Image(
                 painter = rememberAsyncImagePainter(
-                    model = notification.fromUserAvatar.ifEmpty {
-                        "https://ui-avatars.com/api/?name=${notification.fromUserName.replace(" ", "+")}&background=2E7D32&color=fff"
-                    }
+                    model = ImageRequest.Builder(context)
+                        .data(avatarModel)
+                        .crossfade(true)
+                        .build()
                 ),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp).clip(CircleShape),
@@ -150,7 +187,8 @@ fun NotificationItem(
                         when (notification.type) {
                             "like" -> Color(0xFFE53935)
                             "comment" -> Color(0xFF1E88E5)
-                            "share" -> Color(0xFF2E7D32) // Màu xanh lá cho chia sẻ
+                            "share" -> Color(0xFF2E7D32)
+                            "follow" -> Color(0xFF9C27B0)
                             else -> MaterialTheme.colorScheme.primary
                         }
                     ),
@@ -160,7 +198,8 @@ fun NotificationItem(
                     imageVector = when (notification.type) {
                         "like" -> Icons.Default.Favorite
                         "comment" -> Icons.Default.ChatBubble
-                        "share" -> Icons.Default.Share // Icon share
+                        "share" -> Icons.Default.Share
+                        "follow" -> Icons.Default.Person
                         else -> Icons.Default.Notifications
                     },
                     contentDescription = null,
@@ -175,7 +214,7 @@ fun NotificationItem(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = notification.fromUserName,
+                    text = fromUserName,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )

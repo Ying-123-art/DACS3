@@ -132,9 +132,14 @@ fun HomeScreen(
                 } else {
                     LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
                         items(items = uiState.filteredPosts, key = { it.id }) { post ->
+                            // Lấy thông tin user mới nhất từ map
+                            val latestUser = uiState.users[post.userId]
+                            
                             PostCard(
                                 post = post,
                                 currentUserId = uiState.currentUserId,
+                                authorAvatarUrl = latestUser?.avatarUrl ?: post.authorAvatarUrl,
+                                authorName = latestUser?.displayName ?: post.authorName,
                                 onAuthorClick = { userId ->
                                     if (userId == uiState.currentUserId) onNavigateToProfile()
                                     else onNavigateToOtherProfile(userId)

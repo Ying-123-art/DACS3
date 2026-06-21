@@ -71,25 +71,26 @@ fun MapScreen(
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         controller.setZoom(6.0)
-                        // Default center on Vietnam
                         controller.setCenter(GeoPoint(16.0, 108.0))
                     }
                 },
                 update = { mapView ->
                     mapView.overlays.clear()
                     
-                    // Add markers for all posts
                     postsWithLocation.forEach { post ->
+                        // Lấy thông tin user mới nhất để hiển thị tên đúng
+                        val latestUser = uiState.users[post.userId]
+                        val displayName = latestUser?.displayName ?: post.authorName
+
                         val marker = Marker(mapView).apply {
                             position = GeoPoint(post.latitude, post.longitude)
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = post.title.ifEmpty { post.authorName }
-                            snippet = post.location
+                            title = post.title.ifEmpty { displayName }
+                            snippet = "Người đăng: $displayName\nĐịa điểm: ${post.location}"
                         }
                         mapView.overlays.add(marker)
                     }
 
-                    // Handle focus point if it exists
                     uiState.mapFocusPoint?.let { (lat, lon) ->
                         val focusPoint = GeoPoint(lat, lon)
                         mapView.controller.animateTo(focusPoint)
