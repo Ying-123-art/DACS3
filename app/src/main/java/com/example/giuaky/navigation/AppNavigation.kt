@@ -74,6 +74,7 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToEdit = { postId -> navController.navigate(NavRoutes.editRoute(postId)) },
                 onNavigateToComments = { postId -> navController.navigate(NavRoutes.commentsRoute(postId)) },
                 onNavigateToProfile = { navController.navigate(NavRoutes.PROFILE) },
+                onNavigateToOtherProfile = { userId -> navController.navigate(NavRoutes.profileRoute(userId)) },
                 onNavigateToMap = { lat, lon ->
                     navController.navigate(NavRoutes.mapRoute(lat, lon))
                 },
@@ -120,6 +121,7 @@ fun AppNavigation(navController: NavHostController) {
             val authViewModel: AuthViewModel = viewModel()
             ProfileScreen(
                 viewModel = profileViewModel,
+                userId = null,
                 onLogout = {
                     authViewModel.logout()
                     navController.navigate(NavRoutes.LOGIN) {
@@ -129,6 +131,32 @@ fun AppNavigation(navController: NavHostController) {
                 onBack = { navController.popBackStack() },
                 onNavigateToMap = { lat, lon ->
                     navController.navigate(NavRoutes.mapRoute(lat, lon))
+                },
+                onNavigateToOtherProfile = { userId ->
+                    navController.navigate(NavRoutes.profileRoute(userId))
+                },
+                onShareClick = { originalPost, sharedText ->
+                    profileViewModel.sharePost(originalPost, sharedText)
+                }
+            )
+        }
+
+        composable(
+            route = NavRoutes.OTHERS_PROFILE,
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val profileViewModel: ProfileViewModel = viewModel()
+            ProfileScreen(
+                viewModel = profileViewModel,
+                userId = userId,
+                onLogout = {},
+                onBack = { navController.popBackStack() },
+                onNavigateToMap = { lat, lon ->
+                    navController.navigate(NavRoutes.mapRoute(lat, lon))
+                },
+                onNavigateToOtherProfile = { otherId ->
+                    navController.navigate(NavRoutes.profileRoute(otherId))
                 },
                 onShareClick = { originalPost, sharedText ->
                     profileViewModel.sharePost(originalPost, sharedText)

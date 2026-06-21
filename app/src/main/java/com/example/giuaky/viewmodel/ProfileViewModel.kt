@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream
 data class ProfileUiState(
     val user: User? = null,
     val posts: List<Post> = emptyList(),
+    val isFollowing: Boolean = false,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
@@ -35,12 +36,13 @@ class ProfileViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
-    fun loadProfile(uid: String) {
+    fun loadProfile(uid: String, currentUid: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val userResult = userRepo.getUserProfile(uid)
             userResult.onSuccess { user ->
-                _uiState.update { it.copy(user = user, isLoading = false) }
+                val following = userRepo.isFollowing(currentUid, uid)
+                _uiState.update { it.copy(user = user, isFollowing = following, isLoading = false) }
             }.onFailure {
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -48,6 +50,21 @@ class ProfileViewModel : ViewModel() {
         viewModelScope.launch {
             postRepo.getPostsByUser(uid).collect { posts ->
                 _uiState.update { it.copy(posts = posts) }
+            }
+        }
+    }
+
+    fun toggleFollow(currentUid: String, targetUid: String) {
+        viewModelScope.launch {
+            val isCurrentlyFollowing = _uiState.value.isFollowing
+            val result = if (isCurrentlyFollowing) {
+                userRepo.unfollowUser(currentUid, targetUid)
+            } else {
+                userRepo.followUser(currentUid, targetUid)
+            }
+            
+            result.onSuccess {
+                _uiState.update { it.copy(isFollowing = !isCurrentlyFollowing) }
             }
         }
     }
@@ -105,7 +122,7 @@ class ProfileViewModel : ViewModel() {
     }
 
     private fun scaleBitmap(bitmap: Bitmap): Bitmap {
-        val maxSize = 250 // Avatar cần nhỏ hơn post để tiết kiệm dung lượng
+        val maxSize = 250
         val width = bitmap.width
         val height = bitmap.height
         if (width <= maxSize && height <= maxSize) return bitmap

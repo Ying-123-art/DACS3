@@ -55,6 +55,46 @@ class UserRepository {
         }
     }
 
+    // --- FOLLOW SYSTEM ---
+
+    suspend fun followUser(currentUserId: String, targetUserId: String): Result<Unit> {
+        return try {
+            db.child("following").child(currentUserId).child(targetUserId).setValue(true).await()
+            db.child("followers").child(targetUserId).child(currentUserId).setValue(true).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Result<Unit> {
+        return try {
+            db.child("following").child(currentUserId).child(targetUserId).removeValue().await()
+            db.child("followers").child(targetUserId).child(currentUserId).removeValue().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun isFollowing(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            val snapshot = db.child("following").child(currentUserId).child(targetUserId).get().await()
+            snapshot.exists()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun getFollowers(userId: String): List<String> {
+        return try {
+            val snapshot = db.child("followers").child(userId).get().await()
+            snapshot.children.mapNotNull { it.key }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     // --- CÁC HÀM CHO ADMIN (SỬ DỤNG REALTIME DATABASE) ---
 
     // 1. Kiểm tra role của một user

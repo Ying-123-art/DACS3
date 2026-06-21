@@ -7,6 +7,7 @@ object NavRoutes {
     const val CREATE = "create"
     const val EDIT = "edit/{postId}"
     const val PROFILE = "profile"
+    const val OTHERS_PROFILE = "profile/{userId}"
     const val COMMENTS = "comments/{postId}"
     const val MAP = "map?lat={lat}&lon={lon}"
     const val NOTIFICATIONS = "notifications"
@@ -14,6 +15,7 @@ object NavRoutes {
 
     fun editRoute(postId: String) = "edit/$postId"
     fun commentsRoute(postId: String) = "comments/$postId"
+    fun profileRoute(userId: String) = "profile/$userId"
     fun mapRoute(lat: Double? = null, lon: Double? = null): String {
         return if (lat != null && lon != null) "map?lat=$lat&lon=$lon" else "map"
     }

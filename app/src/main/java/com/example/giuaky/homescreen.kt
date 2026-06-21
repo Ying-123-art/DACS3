@@ -27,6 +27,7 @@ fun HomeScreen(
     onNavigateToEdit: (String) -> Unit,
     onNavigateToComments: (String) -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToOtherProfile: (String) -> Unit,
     onNavigateToMap: (Double?, Double?) -> Unit,
     onNavigateToNotifications: () -> Unit
 ) {
@@ -134,6 +135,10 @@ fun HomeScreen(
                             PostCard(
                                 post = post,
                                 currentUserId = uiState.currentUserId,
+                                onAuthorClick = { userId ->
+                                    if (userId == uiState.currentUserId) onNavigateToProfile()
+                                    else onNavigateToOtherProfile(userId)
+                                },
                                 onEditClick = { onNavigateToEdit(post.id) },
                                 onLikeClick = { viewModel.toggleLike(post.id) },
                                 onCommentClick = { onNavigateToComments(post.id) },
