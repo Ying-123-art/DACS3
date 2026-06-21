@@ -167,8 +167,8 @@ fun EditScreen(
                                 postId,
                                 title,
                                 content,
-                                uiState.post?.imageUrl ?: "",
-                                newImageUri
+                                listOf(uiState.post?.imageUrl ?: ""), // Fix for line 170: Wraps String in List<String>
+                                listOfNotNull(newImageUri)            // Fix for line 171: Creates List<Uri>, or empty list if null
                             )
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),

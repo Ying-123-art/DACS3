@@ -1,6 +1,5 @@
 package com.example.giuaky.ui.components
 
-import android.util.Base64
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -44,9 +43,7 @@ fun PostCard(
     onCommentClick: () -> Unit,
     onLocationClick: (Double, Double) -> Unit,
     onShareClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    authorAvatarUrl: String = post.authorAvatarUrl, // Thêm parameter để nhận avatar mới nhất
-    authorName: String = post.authorName // Thêm parameter để nhận tên mới nhất
+    modifier: Modifier = Modifier
 ) {
     val isLiked = post.likedBy.containsKey(currentUserId)
     val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
@@ -65,23 +62,6 @@ fun PostCard(
         label = "likeColor"
     )
 
-    // Logic xử lý Avatar cho tác giả bài viết
-    val authorAvatarModel = remember(authorAvatarUrl) {
-        val url = authorAvatarUrl
-        if (url.isEmpty()) {
-            "https://ui-avatars.com/api/?name=${authorName.replace(" ", "+")}&background=2E7D32&color=fff"
-        } else if (url.startsWith("http")) {
-            url
-        } else {
-            try {
-                val cleanBase64 = url.substringAfter("base64,")
-                Base64.decode(cleanBase64, Base64.DEFAULT)
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -99,7 +79,7 @@ fun PostCard(
                 Image(
                     painter = rememberAsyncImagePainter(
                         model = ImageRequest.Builder(context)
-                            .data(authorAvatarModel)
+                            .data(post.authorAvatarUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.authorName.replace(" ", "+")}&background=2E7D32&color=fff" })
                             .crossfade(true)
                             .build()
                     ),
@@ -116,7 +96,7 @@ fun PostCard(
                         .weight(1f)
                         .clickable { onAuthorClick(post.userId) }
                 ) {
-                    Text(text = authorName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(text = post.authorName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(text = dateString, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 if (post.userId == currentUserId && !post.isShared) {
@@ -164,17 +144,17 @@ fun PostCard(
                 }
             }
 
-            // Image Display (Bài đăng)
+            // Image Display
             if (post.imageUrl.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
 
-                val postImageModel = remember(post.imageUrl) {
+                val imageModel = remember(post.imageUrl) {
                     if (post.imageUrl.startsWith("http")) {
                         post.imageUrl
                     } else {
                         try {
                             val cleanBase64 = post.imageUrl.substringAfter("base64,")
-                            Base64.decode(cleanBase64, Base64.DEFAULT)
+                            android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
                         } catch (e: Exception) {
                             null
                         }
@@ -184,7 +164,7 @@ fun PostCard(
                 Image(
                     painter = rememberAsyncImagePainter(
                         model = ImageRequest.Builder(context)
-                            .data(postImageModel)
+                            .data(imageModel)
                             .crossfade(true)
                             .build()
                     ),

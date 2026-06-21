@@ -157,7 +157,7 @@ class HomeViewModel(context: Context) : ViewModel() {
 
 private fun Post.toEntity() = PostEntity(
     id = id, userId = userId, authorName = authorName, authorAvatarUrl = authorAvatarUrl,
-    title = title, content = content, imageUrl = imageUrl, location = location,
+    title = title, content = content, imageUrls = imageUrls, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
     likesCount = likesCount, commentsCount = commentsCount,
     status = status,
@@ -169,7 +169,7 @@ private fun Post.toEntity() = PostEntity(
 
 private fun PostEntity.toPost() = Post(
     id = id, userId = userId, authorName = authorName, authorAvatarUrl = authorAvatarUrl,
-    title = title, content = content, imageUrl = imageUrl, location = location,
+    title = title, content = content, imageUrls = imageUrls, location = location,
     latitude = latitude, longitude = longitude, timestamp = timestamp,
     likesCount = likesCount, commentsCount = commentsCount,
     status = status,

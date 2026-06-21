@@ -11,7 +11,7 @@ data class Post(
     @get:PropertyName("authorAvatarUrl") @set:PropertyName("authorAvatarUrl") var authorAvatarUrl: String = "",
     @get:PropertyName("title") @set:PropertyName("title") var title: String = "",
     @get:PropertyName("content") @set:PropertyName("content") var content: String = "",
-    @get:PropertyName("imageUrl") @set:PropertyName("imageUrl") var imageUrl: String = "",
+    @get:PropertyName("imageUrls") @set:PropertyName("imageUrls") var imageUrls: List<String> = emptyList(),
     @get:PropertyName("location") @set:PropertyName("location") var location: String = "",
     @get:PropertyName("latitude") @set:PropertyName("latitude") var latitude: Double = 0.0,
     @get:PropertyName("longitude") @set:PropertyName("longitude") var longitude: Double = 0.0,
@@ -26,4 +26,14 @@ data class Post(
     @get:PropertyName("originalPostId") @set:PropertyName("originalPostId") var originalPostId: String? = null,
     @get:PropertyName("sharedContent") @set:PropertyName("sharedContent") var sharedContent: String = "",
     @get:PropertyName("originalAuthorName") @set:PropertyName("originalAuthorName") var originalAuthorName: String = ""
-)
+) {
+    // Backward compatibility for single imageUrl if needed
+    @get:PropertyName("imageUrl") @set:PropertyName("imageUrl")
+    var imageUrl: String
+        get() = imageUrls.firstOrNull() ?: ""
+        set(value) {
+            if (imageUrls.isEmpty() && value.isNotEmpty()) {
+                imageUrls = listOf(value)
+            }
+        }
+}

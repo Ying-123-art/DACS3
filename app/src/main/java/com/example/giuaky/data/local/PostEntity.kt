@@ -11,7 +11,7 @@ data class PostEntity(
     val authorAvatarUrl: String = "",
     val title: String = "",
     val content: String = "",
-    val imageUrl: String = "",
+    val imageUrls: List<String> = emptyList(), // Store as list, will use TypeConverter
     val location: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
