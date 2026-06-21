@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.PersonAdd
@@ -42,6 +43,7 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onNavigateToMap: (Double, Double) -> Unit,
     onNavigateToOtherProfile: (String) -> Unit,
+    onNavigateToChat: (String, String, String) -> Unit,
     onShareClick: (Post, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,20 +150,35 @@ fun ProfileScreen(
                     Spacer(Modifier.height(12.dp))
 
                     if (!isOwnProfile) {
-                        Button(
-                            onClick = { viewModel.toggleFollow(currentUid, targetUid) },
-                            colors = if (uiState.isFollowing) 
-                                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                                else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.height(40.dp)
-                        ) {
-                            Icon(
-                                if (uiState.isFollowing) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
-                                null, Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (uiState.isFollowing) "Đang theo dõi" else "Theo dõi")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.toggleFollow(currentUid, targetUid) },
+                                colors = if (uiState.isFollowing) 
+                                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                    else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.height(40.dp)
+                            ) {
+                                Icon(
+                                    if (uiState.isFollowing) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
+                                    null, Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (uiState.isFollowing) "Đang theo dõi" else "Theo dõi")
+                            }
+                            
+                            OutlinedButton(
+                                onClick = {
+                                    val roomId = if (currentUid < targetUid) "${currentUid}_${targetUid}" else "${targetUid}_${currentUid}"
+                                    onNavigateToChat(roomId, targetUid, uiState.user?.displayName ?: "Người dùng")
+                                },
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.height(40.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Nhắn tin")
+                            }
                         }
                     } else {
                         OutlinedButton(

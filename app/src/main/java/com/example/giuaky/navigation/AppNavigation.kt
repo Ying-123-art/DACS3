@@ -16,18 +16,9 @@ import com.example.giuaky.EditScreen
 import com.example.giuaky.HomeScreen
 import com.example.giuaky.LoginScreen
 import com.example.giuaky.RegisterScreen
-import com.example.giuaky.ui.screen.CommentScreen
-import com.example.giuaky.ui.screen.MapScreen
-import com.example.giuaky.ui.screen.NotificationScreen
-import com.example.giuaky.ui.screen.ProfileScreen
-import com.example.giuaky.viewmodel.AdminViewModel
-import com.example.giuaky.viewmodel.AuthViewModel
-import com.example.giuaky.viewmodel.CommentViewModel
-import com.example.giuaky.viewmodel.HomeViewModel
-import com.example.giuaky.viewmodel.HomeViewModelFactory
-import com.example.giuaky.viewmodel.NotificationViewModel
-import com.example.giuaky.viewmodel.PostViewModel
-import com.example.giuaky.viewmodel.ProfileViewModel
+import com.example.giuaky.ui.screen.*
+import com.example.giuaky.viewmodel.*
+import java.net.URLDecoder
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
@@ -78,7 +69,8 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToMap = { lat, lon ->
                     navController.navigate(NavRoutes.mapRoute(lat, lon))
                 },
-                onNavigateToNotifications = { navController.navigate(NavRoutes.NOTIFICATIONS) }
+                onNavigateToNotifications = { navController.navigate(NavRoutes.NOTIFICATIONS) },
+                onNavigateToChatList = { navController.navigate(NavRoutes.CHAT_LIST) }
             )
         }
 
@@ -135,6 +127,9 @@ fun AppNavigation(navController: NavHostController) {
                 onNavigateToOtherProfile = { userId ->
                     navController.navigate(NavRoutes.profileRoute(userId))
                 },
+                onNavigateToChat = { roomId: String, otherUserId: String, otherUserName: String ->
+                    navController.navigate(NavRoutes.chatDetailRoute(roomId, otherUserId, otherUserName))
+                },
                 onShareClick = { originalPost, sharedText ->
                     profileViewModel.sharePost(originalPost, sharedText)
                 }
@@ -157,6 +152,9 @@ fun AppNavigation(navController: NavHostController) {
                 },
                 onNavigateToOtherProfile = { otherId ->
                     navController.navigate(NavRoutes.profileRoute(otherId))
+                },
+                onNavigateToChat = { roomId: String, otherUserId: String, otherUserName: String ->
+                    navController.navigate(NavRoutes.chatDetailRoute(roomId, otherUserId, otherUserName))
                 },
                 onShareClick = { originalPost, sharedText ->
                     profileViewModel.sharePost(originalPost, sharedText)
@@ -218,6 +216,45 @@ fun AppNavigation(navController: NavHostController) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(NavRoutes.CHAT_LIST) {
+            val chatViewModel: ChatViewModel = viewModel()
+            ChatListScreen(
+                viewModel = chatViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToChat = { roomId: String, otherUserId: String, otherUserName: String ->
+                    navController.navigate(NavRoutes.chatDetailRoute(roomId, otherUserId, otherUserName))
+                }
+            )
+        }
+
+        composable(
+            route = NavRoutes.CHAT_DETAIL,
+            arguments = listOf(
+                navArgument("roomId") { type = NavType.StringType },
+                navArgument("otherUserId") { type = NavType.StringType },
+                navArgument("otherUserName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val roomId = backStackEntry.arguments?.getString("roomId") ?: ""
+            val otherUserId = backStackEntry.arguments?.getString("otherUserId") ?: ""
+            val otherUserName = backStackEntry.arguments?.getString("otherUserName") ?: ""
+            val chatViewModel: ChatViewModel = viewModel()
+            
+            val decodedName = try {
+                URLDecoder.decode(otherUserName, "UTF-8")
+            } catch (e: Exception) {
+                otherUserName
+            }
+
+            ChatDetailScreen(
+                viewModel = chatViewModel,
+                roomId = roomId,
+                otherUserId = otherUserId,
+                initialOtherUserName = decodedName,
+                onBack = { navController.popBackStack() }
             )
         }
     }

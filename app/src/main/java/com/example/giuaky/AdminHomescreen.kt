@@ -1,6 +1,8 @@
 package com.example.giuaky
 
+import android.util.Base64
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -192,20 +194,39 @@ fun PostsTab(viewModel: AdminViewModel) {
                     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), shape = RoundedCornerShape(12.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (post.imageUrl.isNotEmpty()) {
-                                    Image(
-                                        painter = rememberAsyncImagePainter(
-                                            model = ImageRequest.Builder(context)
-                                                .data(post.imageUrl)
-                                                .crossfade(true)
-                                                .build()
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
+                                // Xử lý hiển thị ảnh bài viết (hỗ trợ cả imageUrl đơn và danh sách imageUrls)
+                                val postImageData = post.imageUrl.ifEmpty { post.imageUrls.firstOrNull() ?: "" }
+                                
+                                if (postImageData.isNotEmpty()) {
+                                    val imageModel = remember(postImageData) {
+                                        if (postImageData.startsWith("http")) {
+                                            postImageData
+                                        } else {
+                                            try {
+                                                val cleanBase64 = postImageData.substringAfter("base64,")
+                                                Base64.decode(cleanBase64, Base64.DEFAULT)
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                        }
+                                    }
+                                    
+                                    Box(modifier = Modifier.size(90.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                                        Image(
+                                            painter = rememberAsyncImagePainter(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(imageModel)
+                                                    .crossfade(true)
+                                                    .build()
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
                                     Spacer(Modifier.width(12.dp))
                                 }
+                                
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(post.title.ifEmpty { "(Không có tiêu đề)" }, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     Text("Bởi: ${post.authorName}", style = MaterialTheme.typography.bodySmall)
@@ -223,7 +244,7 @@ fun PostsTab(viewModel: AdminViewModel) {
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text(post.content, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+                            Text(post.content, maxLines = 3, style = MaterialTheme.typography.bodyMedium)
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 if (post.status == "pending") {
                                     IconButton(onClick = { viewModel.approvePost(post.id) }) { Icon(Icons.Default.Check, "Duyệt", tint = Color(0xFF2E7D32)) }
@@ -247,17 +268,36 @@ fun UsersTab(viewModel: AdminViewModel) {
         items(uiState.allUsers, key = { it.uid }) { user ->
             Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), shape = RoundedCornerShape(12.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = rememberAsyncImagePainter(
-                            model = ImageRequest.Builder(context)
-                                .data(user.avatarUrl.ifEmpty { "https://ui-avatars.com/api/?name=${user.displayName.replace(" ", "+")}&background=2E7D32&color=fff" })
-                                .crossfade(true)
-                                .build()
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(44.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
+                    val avatarModel = remember(user.avatarUrl, user.displayName) {
+                        val url = user.avatarUrl.trim()
+                        if (url.isEmpty() || url == "null") {
+                            "https://ui-avatars.com/api/?name=${user.displayName.ifEmpty { "U" }.replace(" ", "+")}&background=2E7D32&color=fff&size=128"
+                        } else if (url.startsWith("http")) {
+                            url
+                        } else {
+                            try {
+                                val cleanBase64 = url.substringAfter("base64,")
+                                Base64.decode(cleanBase64, Base64.DEFAULT)
+                            } catch (e: Exception) {
+                                "https://ui-avatars.com/api/?name=${user.displayName.ifEmpty { "U" }.replace(" ", "+")}&background=2E7D32&color=fff"
+                            }
+                        }
+                    }
+                    
+                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Image(
+                            painter = rememberAsyncImagePainter(
+                                model = ImageRequest.Builder(context)
+                                    .data(avatarModel)
+                                    .crossfade(true)
+                                    .build()
+                            ),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(user.displayName.ifEmpty { "Chưa đặt tên" }, fontWeight = FontWeight.SemiBold)

@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -29,7 +30,8 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToOtherProfile: (String) -> Unit,
     onNavigateToMap: (Double?, Double?) -> Unit,
-    onNavigateToNotifications: () -> Unit
+    onNavigateToNotifications: () -> Unit,
+    onNavigateToChatList: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by remember { mutableStateOf(NavRoutes.HOME) }
@@ -75,7 +77,12 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("🌿 WildLog", style = MaterialTheme.typography.titleLarge) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                actions = {
+                    IconButton(onClick = onNavigateToChatList) {
+                        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Tin nhắn")
+                    }
+                }
             )
         },
         floatingActionButton = {
