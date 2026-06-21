@@ -1,5 +1,6 @@
 package com.example.giuaky.ui.components
 
+import android.util.Base64
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,7 +45,9 @@ fun PostCard(
     onCommentClick: () -> Unit,
     onLocationClick: (Double, Double) -> Unit,
     onShareClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authorAvatarUrl: String = post.authorAvatarUrl,
+    authorName: String = post.authorName
 ) {
     val isLiked = post.likedBy.containsKey(currentUserId)
     val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
@@ -62,6 +66,24 @@ fun PostCard(
         label = "likeColor"
     )
 
+    // Xử lý avatar model an toàn (giống ProfileScreen)
+    val avatarModel = remember(authorAvatarUrl, authorName) {
+        val url = authorAvatarUrl.trim()
+        if (url.isEmpty() || url == "null") {
+            "https://ui-avatars.com/api/?name=${authorName.ifEmpty { "U" }.replace(" ", "+")}&background=2E7D32&color=fff&size=128"
+        } else if (url.startsWith("http")) {
+            url
+        } else {
+            try {
+                val cleanBase64 = url.substringAfter("base64,")
+                Base64.decode(cleanBase64, Base64.DEFAULT)
+            } catch (e: Exception) {
+                // Nếu lỗi giải mã, hiện avatar theo tên
+                "https://ui-avatars.com/api/?name=${authorName.ifEmpty { "U" }.replace(" ", "+")}&background=2E7D32&color=fff&size=128"
+            }
+        }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -79,7 +101,7 @@ fun PostCard(
                 Image(
                     painter = rememberAsyncImagePainter(
                         model = ImageRequest.Builder(context)
-                            .data(post.authorAvatarUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.authorName.replace(" ", "+")}&background=2E7D32&color=fff" })
+                            .data(avatarModel)
                             .crossfade(true)
                             .build()
                     ),
@@ -96,7 +118,7 @@ fun PostCard(
                         .weight(1f)
                         .clickable { onAuthorClick(post.userId) }
                 ) {
-                    Text(text = post.authorName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(text = authorName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(text = dateString, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
                 if (post.userId == currentUserId && !post.isShared) {
@@ -144,17 +166,16 @@ fun PostCard(
                 }
             }
 
-            // Image Display
+            // Image Display (Bài đăng)
             if (post.imageUrl.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
-
                 val imageModel = remember(post.imageUrl) {
                     if (post.imageUrl.startsWith("http")) {
                         post.imageUrl
                     } else {
                         try {
                             val cleanBase64 = post.imageUrl.substringAfter("base64,")
-                            android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                            Base64.decode(cleanBase64, Base64.DEFAULT)
                         } catch (e: Exception) {
                             null
                         }
@@ -243,6 +264,19 @@ fun PostCard(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = "Bình luận",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                TextButton(onClick = onShareClick) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Chia sẻ",
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
